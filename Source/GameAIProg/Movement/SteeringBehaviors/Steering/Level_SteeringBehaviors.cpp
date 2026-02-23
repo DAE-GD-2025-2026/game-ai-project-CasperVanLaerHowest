@@ -75,6 +75,17 @@ void ALevel_SteeringBehaviors::Tick(float DeltaTime)
 	}
 	ImGui::Spacing();
 
+	for(ImGui_Agent& a : SteeringAgents)
+	{
+		if (a.Agent)
+		{
+			if (!a.Agent->GetDebugRenderingEnabled())
+				continue;
+
+			// debug each agent to show their current target and behavior info
+		}
+	}
+
 #pragma region PerAgentUI
 	if (ImGui::Button("Add Agent"))
 		AddAgent(BehaviorTypes::Seek);
@@ -224,13 +235,15 @@ void ALevel_SteeringBehaviors::SetAgentBehavior(ImGui_Agent& Agent)
 	Agent.Behavior.reset();
 	switch (static_cast<BehaviorTypes>(Agent.SelectedBehavior))
 	{
-	case BehaviorTypes::Seek:
-		Agent.Behavior = std::make_unique<Seek>();
-		break;
-
-	default:
-		Agent.Behavior = std::make_unique<Seek>(); // fallback to Seek until other behaviors are implemented
-        break;
+		case BehaviorTypes::Seek:
+			Agent.Behavior = std::make_unique<Seek>();
+			break;
+		case BehaviorTypes::Flee:
+			Agent.Behavior = std::make_unique<Flee>();
+			break;
+		default:
+			Agent.Behavior = std::make_unique<Seek>(); // fallback to Seek until other behaviors are implemented
+			break;
     }
 	UpdateTarget(Agent);
 	
