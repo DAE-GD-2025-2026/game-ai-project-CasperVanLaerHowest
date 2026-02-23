@@ -112,7 +112,12 @@ void ALevel_SteeringBehaviors::Tick(float DeltaTime)
 			case static_cast<int>(BehaviorTypes::Evade):
 				break;
 			case static_cast<int>(BehaviorTypes::Pursuit):
-				break;
+				{
+					const FVector agentLocation = a.Agent->GetActorLocation();
+					const FVector forwardEnd = agentLocation + (a.Agent->GetActorForwardVector() * 100.f);
+					DrawDebugLine(GetWorld(), agentLocation, forwardEnd, FColor::Cyan);
+					break;
+				}
 			case static_cast<int>(BehaviorTypes::Face):
 				{
 					const FVector agentLocation = a.Agent->GetActorLocation();
