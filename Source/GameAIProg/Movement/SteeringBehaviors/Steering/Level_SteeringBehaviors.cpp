@@ -5,6 +5,7 @@
 #include <format>
 #include <string>
 #include "imgui.h"
+#include "DrawDebugHelpers.h"
 
 
 // Sets default values
@@ -81,8 +82,34 @@ void ALevel_SteeringBehaviors::Tick(float DeltaTime)
 		{
 			if (!a.Agent->GetDebugRenderingEnabled())
 				continue;
-
+			
+			auto targetPos2d = a.Behavior->GetTarget().Position;
+			const FVector targetPos{targetPos2d.X, targetPos2d.Y, a.Agent->GetActorLocation().Z};
 			// debug each agent to show their current target and behavior info
+			
+			switch (a.SelectedBehavior)
+			{
+			case static_cast<int>(BehaviorTypes::Seek):	
+				DrawDebugLine(GetWorld(), a.Agent->GetActorLocation(), targetPos, FColor::Cyan);
+				DrawDebugPoint(GetWorld(), targetPos, 10.f,FColor::Cyan);
+				break;
+			case static_cast<int>(BehaviorTypes::Wander):
+				break;
+			case static_cast<int>(BehaviorTypes::Flee):
+			{
+				Flee* flee = a.Behavior->As<Flee>();
+				DrawDebugCircle(GetWorld(),targetPos,flee->GetRadius(),32,FColor::Cyan,false,-1,0,5,FVector::YAxisVector,FVector::XAxisVector);
+				break;
+			}
+			case static_cast<int>(BehaviorTypes::Arrive):
+				break;
+			case static_cast<int>(BehaviorTypes::Evade):
+				break;
+			case static_cast<int>(BehaviorTypes::Pursuit):
+				break;
+			default:
+				break;
+			}
 		}
 	}
 

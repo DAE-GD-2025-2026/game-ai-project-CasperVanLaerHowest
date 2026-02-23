@@ -16,7 +16,7 @@ public:
 	virtual SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent & Agent) = 0;
 
 	void SetTarget(const FTargetData& NewTarget) { Target = NewTarget; }
-	
+	const FTargetData& GetTarget() const { return Target; }
 	template<class T, std::enable_if_t<std::is_base_of_v<ISteeringBehavior, T>>* = nullptr>
 	T* As()
 	{ return static_cast<T*>(this); }
@@ -41,7 +41,7 @@ class Flee : public ISteeringBehavior
 public:
 	Flee() = default;
 	virtual ~Flee() = default;
-
+	const float GetRadius() const {return m_radius;}
 	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
 private:
 	float m_radius{ 300.f }; // radius within which the agent will attempt to flee from the target
