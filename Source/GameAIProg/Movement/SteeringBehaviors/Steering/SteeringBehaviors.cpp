@@ -99,3 +99,38 @@ SteeringOutput Pursuit::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
     steering.LinearVelocity *= Agent.GetMaxLinearSpeed();
     return steering;
 }
+
+SteeringOutput Evade::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+    SteeringOutput steering{};
+    constexpr float EvadeRadius = 500.f;
+
+    FTargetData targetData = Target;
+    if (TargetAgent)
+    {
+        targetData.Position = TargetAgent->GetPosition();
+        targetData.Orientation = TargetAgent->GetRotation();
+        targetData.LinearVelocity = TargetAgent->GetLinearVelocity();
+        targetData.AngularVelocity = TargetAgent->GetAngularVelocity();
+    }
+
+    const FVector2D toTarget = targetData.Position - Agent.GetPosition();
+    const float distance = toTarget.Size();
+    /*if (distance < 1.f)
+        return steering;*/
+
+    const float ownSpeed = FMath::Max(Agent.GetMaxLinearSpeed(), KINDA_SMALL_NUMBER);
+    const float predictionTime = distance / ownSpeed;
+    const FVector2D predictedPos = targetData.Position + (targetData.LinearVelocity * 0.5);
+
+    if ((predictedPos - Agent.GetPosition()).Size() > EvadeRadius)
+        return steering;
+
+    steering.LinearVelocity = Agent.GetPosition() - predictedPos;
+    if (steering.LinearVelocity.SizeSquared() < KINDA_SMALL_NUMBER)
+        return steering;
+
+    steering.LinearVelocity.Normalize();
+    steering.LinearVelocity *= Agent.GetMaxLinearSpeed();
+    return steering;
+}

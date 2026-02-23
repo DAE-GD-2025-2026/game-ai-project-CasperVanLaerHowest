@@ -81,3 +81,16 @@ public:
 private:
 	ASteeringAgent* TargetAgent{nullptr}; // non-owning
 };
+
+class Evade : public ISteeringBehavior
+{
+public:
+	Evade() = default;
+	virtual ~Evade() = default;
+	void SetTargetAgent(ASteeringAgent* InTargetAgent) { TargetAgent = InTargetAgent; }
+	ASteeringAgent* GetTargetAgent() const { return TargetAgent; }
+	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
+
+private:
+	ASteeringAgent* TargetAgent{nullptr}; // non-owning
+};
