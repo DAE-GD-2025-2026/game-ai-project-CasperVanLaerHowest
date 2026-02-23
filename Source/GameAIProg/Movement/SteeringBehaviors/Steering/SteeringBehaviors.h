@@ -46,3 +46,16 @@ public:
 private:
 	float m_radius{ 300.f }; // radius within which the agent will attempt to flee from the target
 };
+
+class Arrive : public ISteeringBehavior
+{
+public:
+	Arrive() = default;
+	virtual ~Arrive() = default;
+	const float GetRadiusFar() const {return m_radiusFar;}
+	const float GetRadiusNear() const {return m_radiusNear;}
+	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
+private:
+	float m_radiusFar{ 300.f };
+	float m_radiusNear{ 100.f };
+};

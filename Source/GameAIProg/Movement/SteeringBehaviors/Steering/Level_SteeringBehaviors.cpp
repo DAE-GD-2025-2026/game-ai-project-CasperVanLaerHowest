@@ -102,7 +102,13 @@ void ALevel_SteeringBehaviors::Tick(float DeltaTime)
 				break;
 			}
 			case static_cast<int>(BehaviorTypes::Arrive):
-				break;
+				{
+					Arrive* arrive = a.Behavior->As<Arrive>();
+					DrawDebugPoint(GetWorld(), targetPos, 10.f,FColor::Cyan);
+					DrawDebugCircle(GetWorld(),a.Agent->GetActorLocation(),arrive->GetRadiusFar(),32,FColor::Cyan,false,-1,0,5,FVector::YAxisVector,FVector::XAxisVector);
+					DrawDebugCircle(GetWorld(),a.Agent->GetActorLocation(),arrive->GetRadiusNear(),32,FColor::Cyan,false,-1,0,5,FVector::YAxisVector,FVector::XAxisVector);
+					break;
+				}
 			case static_cast<int>(BehaviorTypes::Evade):
 				break;
 			case static_cast<int>(BehaviorTypes::Pursuit):
@@ -267,6 +273,9 @@ void ALevel_SteeringBehaviors::SetAgentBehavior(ImGui_Agent& Agent)
 			break;
 		case BehaviorTypes::Flee:
 			Agent.Behavior = std::make_unique<Flee>();
+			break;
+		case BehaviorTypes::Arrive:
+			Agent.Behavior = std::make_unique<Arrive>();
 			break;
 		default:
 			Agent.Behavior = std::make_unique<Seek>(); // fallback to Seek until other behaviors are implemented
