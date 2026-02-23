@@ -29,11 +29,14 @@ void ASteeringAgent::Tick(float DeltaTime)
 	if (SteeringBehavior)
 	{
 		SteeringOutput output = SteeringBehavior->CalculateSteering(DeltaTime, *this);
+		
 		const float maxSpeed = GetMaxLinearSpeed();
 		const float speed = output.LinearVelocity.Size();
 		const float speedScale = maxSpeed > 0.f ? FMath::Clamp(speed / maxSpeed, 0.f, 1.f) : 0.f;
 		const FVector2D direction2D = output.LinearVelocity.GetSafeNormal();
 		AddMovementInput(FVector{direction2D, 0.f}, speedScale);
+		AddActorWorldRotation(FRotator{0.f, output.AngularVelocity * DeltaTime, 0.f});
+	
 	}
 }
 

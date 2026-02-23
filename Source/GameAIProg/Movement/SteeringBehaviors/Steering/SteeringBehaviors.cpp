@@ -50,3 +50,52 @@ SteeringOutput Arrive::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
     steering.LinearVelocity = direction * desiredSpeed;
     return steering;
 }
+
+SteeringOutput Face::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+    SteeringOutput steering{};
+
+    const FVector2D toTarget = Target.Position - Agent.GetPosition();
+    if (toTarget.Size() < 1.f)
+        return steering;
+
+    const FVector2D desiredDirection = toTarget.GetSafeNormal();
+    const float desiredYaw = FMath::RadiansToDegrees(FMath::Atan2(desiredDirection.Y, desiredDirection.X));
+    const float currentYaw = Agent.GetRotation();
+    const float deltaYaw = FMath::FindDeltaAngleDegrees(currentYaw, desiredYaw);
+
+    const float safeDeltaT = FMath::Max(DeltaT, KINDA_SMALL_NUMBER);
+    steering.AngularVelocity = FMath::Clamp(deltaYaw / safeDeltaT, -Agent.GetMaxAngularSpeed(), Agent.GetMaxAngularSpeed());
+    return steering;
+}
+
+SteeringOutput Pursuit::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
+{
+    SteeringOutput steering{};
+
+    FTargetData targetData = Target;
+    if (TargetAgent)
+    {
+        targetData.Position = TargetAgent->GetPosition();
+        targetData.Orientation = TargetAgent->GetRotation();
+        targetData.LinearVelocity = TargetAgent->GetLinearVelocity();
+        targetData.AngularVelocity = TargetAgent->GetAngularVelocity();
+    }
+
+    const FVector2D toTarget = targetData.Position - Agent.GetPosition();
+    const float distance = toTarget.Size();
+    if (distance < 1.f)
+        return steering;
+
+    const float ownSpeed = FMath::Max(Agent.GetMaxLinearSpeed(), KINDA_SMALL_NUMBER);
+    const float predictionTime = distance / ownSpeed;
+    const FVector2D predictedPos = targetData.Position + (targetData.LinearVelocity * predictionTime);
+
+    steering.LinearVelocity = predictedPos - Agent.GetPosition();
+    if (steering.LinearVelocity.SizeSquared() < KINDA_SMALL_NUMBER)
+        return steering;
+
+    steering.LinearVelocity.Normalize();
+    steering.LinearVelocity *= Agent.GetMaxLinearSpeed();
+    return steering;
+}

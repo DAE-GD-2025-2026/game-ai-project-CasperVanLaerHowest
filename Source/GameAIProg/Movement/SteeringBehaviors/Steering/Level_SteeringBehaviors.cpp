@@ -113,6 +113,13 @@ void ALevel_SteeringBehaviors::Tick(float DeltaTime)
 				break;
 			case static_cast<int>(BehaviorTypes::Pursuit):
 				break;
+			case static_cast<int>(BehaviorTypes::Face):
+				{
+					const FVector agentLocation = a.Agent->GetActorLocation();
+					const FVector forwardEnd = agentLocation + (a.Agent->GetActorForwardVector() * 100.f);
+					DrawDebugLine(GetWorld(), agentLocation, forwardEnd, FColor::Cyan);
+				}
+				break;
 			default:
 				break;
 			}
@@ -158,7 +165,7 @@ void ALevel_SteeringBehaviors::Tick(float DeltaTime)
 			ImGui::PushItemWidth(100);
 
 			// Add the names of your steering behaviors
-			if (ImGui::Combo("", &a.SelectedBehavior, "Seek\0Wander\0Flee\0Arrive\0Evade\0Pursuit", 4))
+			if (ImGui::Combo("", &a.SelectedBehavior, "Seek\0Wander\0Flee\0Arrive\0Evade\0Pursuit\0Face", static_cast<int>(BehaviorTypes::Count)))
 			{
 				bBehaviourModified = true;
 			}
@@ -277,6 +284,12 @@ void ALevel_SteeringBehaviors::SetAgentBehavior(ImGui_Agent& Agent)
 		case BehaviorTypes::Arrive:
 			Agent.Behavior = std::make_unique<Arrive>();
 			break;
+		case BehaviorTypes::Face:
+			Agent.Behavior = std::make_unique<Face>();
+			break;
+		case BehaviorTypes::Pursuit:
+			Agent.Behavior = std::make_unique<Pursuit>();
+			break;
 		default:
 			Agent.Behavior = std::make_unique<Seek>(); // fallback to Seek until other behaviors are implemented
 			break;
@@ -313,10 +326,20 @@ void ALevel_SteeringBehaviors::UpdateTarget(ImGui_Agent& Agent)
 		Target.AngularVelocity = TargetAgent->GetAngularVelocity();
 
 		Agent.Behavior->SetTarget(Target);
+		if (Agent.SelectedBehavior == static_cast<int>(BehaviorTypes::Pursuit))
+		{
+			Pursuit* pursuit = static_cast<Pursuit*>(Agent.Behavior.get());
+			pursuit->SetTargetAgent(TargetAgent);
+		}
 	}
 	else
 	{
 		Agent.Behavior->SetTarget(MouseTarget);
+		if (Agent.SelectedBehavior == static_cast<int>(BehaviorTypes::Pursuit))
+		{
+			Pursuit* pursuit = static_cast<Pursuit*>(Agent.Behavior.get());
+			pursuit->SetTargetAgent(nullptr);
+		}
 	}
 }
 

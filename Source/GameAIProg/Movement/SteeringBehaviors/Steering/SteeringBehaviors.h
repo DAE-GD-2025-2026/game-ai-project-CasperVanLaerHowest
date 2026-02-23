@@ -59,3 +59,25 @@ private:
 	float m_radiusFar{ 300.f };
 	float m_radiusNear{ 100.f };
 };
+
+class Face : public ISteeringBehavior
+{
+public:
+	Face() = default;
+	virtual ~Face() = default;
+
+	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
+};
+
+class Pursuit : public ISteeringBehavior
+{
+public:
+	Pursuit() = default;
+	virtual ~Pursuit() = default;
+	void SetTargetAgent(ASteeringAgent* InTargetAgent) { TargetAgent = InTargetAgent; }
+	ASteeringAgent* GetTargetAgent() const { return TargetAgent; }
+	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
+
+private:
+	ASteeringAgent* TargetAgent{nullptr}; // non-owning
+};
