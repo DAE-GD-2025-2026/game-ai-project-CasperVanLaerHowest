@@ -94,3 +94,24 @@ public:
 private:
 	ASteeringAgent* TargetAgent{nullptr}; // non-owning
 };
+
+class Wander : public Seek
+{
+public:
+	Wander() = default;
+	virtual ~Wander() = default;
+
+	//Wander Behavior
+	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
+
+	void SetWanderOffset(float offset) { m_OffsetDistance = offset; }
+	void SetWanderRadius(float radius) { m_Radius = radius; }
+	void SetMaxAngleChange(float rad) { m_MaxAngleChange = rad; }
+
+protected:
+	float m_OffsetDistance = 6.f; //Offset (Agent Direction)
+	float m_Radius = 4.f; //WanderRadius
+	float m_MaxAngleChange = FMath::DegreesToRadians(45); //Max random angle offset from forward (radians)
+	float m_WanderAngle = 0.f; //Internal (radians)
+	bool m_HasTarget = false;
+};

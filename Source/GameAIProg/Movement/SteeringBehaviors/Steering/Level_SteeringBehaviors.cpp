@@ -298,6 +298,9 @@ void ALevel_SteeringBehaviors::SetAgentBehavior(ImGui_Agent& Agent)
 		case BehaviorTypes::Pursuit:
 			Agent.Behavior = std::make_unique<Pursuit>();
 			break;
+		case BehaviorTypes::Wander:
+			Agent.Behavior = std::make_unique<Wander>();
+			break;
 		default:
 			Agent.Behavior = std::make_unique<Seek>(); // fallback to Seek until other behaviors are implemented
 			break;

@@ -134,3 +134,37 @@ SteeringOutput Evade::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
     steering.LinearVelocity *= Agent.GetMaxLinearSpeed();
     return steering;
 }
+
+SteeringOutput Wander::CalculateSteering(float deltaT, ASteeringAgent& Agent)
+{
+    SteeringOutput steering{};
+
+    const FVector2D toTarget = Target.Position - Agent.GetPosition();
+    if (!m_HasTarget || toTarget.Size() < 1.f)
+    {
+        const float yawRadians = FMath::DegreesToRadians(Agent.GetRotation());
+        FVector2D forward(
+            FMath::Cos(yawRadians),
+            FMath::Sin(yawRadians)
+        );
+
+        FVector2D point = Agent.GetPosition() + (forward * m_OffsetDistance);
+
+        const float randomAngle = FMath::RandRange(-m_MaxAngleChange, m_MaxAngleChange);
+        m_WanderAngle = randomAngle;
+
+        FVector2D newForward(
+            FMath::Cos(yawRadians + randomAngle),
+            FMath::Sin(yawRadians + randomAngle)
+        );
+
+        FVector2D newPoint = point + (newForward * m_Radius);
+
+        FTargetData NewtargetData(newPoint);
+        SetTarget(NewtargetData);
+        m_HasTarget = true;
+    }
+
+    steering.LinearVelocity = (Target.Position - Agent.GetPosition()).GetSafeNormal() * Agent.GetMaxLinearSpeed();
+    return steering;
+}
