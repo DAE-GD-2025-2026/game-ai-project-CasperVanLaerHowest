@@ -109,9 +109,11 @@ public:
 	void SetMaxAngleChange(float rad) { m_MaxAngleChange = rad; }
 
 protected:
-	float m_OffsetDistance = 6.f; //Offset (Agent Direction)
-	float m_Radius = 4.f; //WanderRadius
+	float m_OffsetDistance = 60.f; //Offset (Agent Direction)
+	float m_Radius = 20.f; //WanderRadius
 	float m_MaxAngleChange = FMath::DegreesToRadians(45); //Max random angle offset from forward (radians)
 	float m_WanderAngle = 0.f; //Internal (radians)
 	bool m_HasTarget = false;
+	
+	FVector2D m_Target{};
 };
