@@ -35,9 +35,13 @@ private:
 	bool UseMouseTarget = false;
 	bool CanDebugRender = false;
 	ASteeringAgent* pCombinedAgent{nullptr}; // non-owning, world-owned actor
+	ASteeringAgent* pPriorityAgent{nullptr}; // non-owning, world-owned actor
 	std::unique_ptr<Seek> pSeekBehavior{nullptr};     // non-owning, owned by blended steering setup
 	std::unique_ptr<Wander> pWanderBehavior{nullptr}; // non-owning, owned by blended steering setup
 	std::unique_ptr<Evade> pEvadeBehavior{nullptr};   // non-owning, owned by blended steering setup (optional)
+	std::unique_ptr<Seek> pPrioritySeekBehavior{nullptr};
+	std::unique_ptr<Wander> pPriorityWanderBehavior{nullptr};
+	std::unique_ptr<Evade> pPriorityEvadeBehavior{nullptr};
 
 	enum class BehaviorTypes
 	{
@@ -61,5 +65,6 @@ private:
 	};
 	
 	std::unique_ptr<BlendedSteering> pBlendedSteering{nullptr};
+	std::unique_ptr<PrioritySteering> pPrioritySteering{nullptr};
 	
 };

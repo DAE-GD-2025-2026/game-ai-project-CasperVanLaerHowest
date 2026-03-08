@@ -2,7 +2,6 @@
 #include "CombinedSteeringBehaviors.h"
 #include "imgui.h"
 #include "DrawDebugHelpers.h"
-#include "Kismet/GameplayStatics.h"
 
 
 // Sets default values
@@ -20,11 +19,18 @@ void ALevel_CombinedSteering::BeginPlay()
 	pSeekBehavior    = std::make_unique<Seek>();
 	pWanderBehavior = std::make_unique<Wander>();
 	pEvadeBehavior   = std::make_unique<Evade>();
+	pPrioritySeekBehavior = std::make_unique<Seek>();
+	pPriorityWanderBehavior = std::make_unique<Wander>();
+	pPriorityEvadeBehavior = std::make_unique<Evade>();
 	
 	
 	pBlendedSteering = std::make_unique<BlendedSteering>(std::vector<BlendedSteering::WeightedBehavior>{
 		{pSeekBehavior.get(),    0.5f},
 		{pWanderBehavior.get(),  0.5f}
+	});
+	pPrioritySteering = std::make_unique<PrioritySteering>(std::vector<ISteeringBehavior*>{
+		pPriorityEvadeBehavior.get(),
+		pPriorityWanderBehavior.get()
 	});
 
 	pCombinedAgent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, FVector{0, 0, 90}, FRotator::ZeroRotator);
@@ -43,6 +49,23 @@ void ALevel_CombinedSteering::BeginPlay()
 			WanderSeed.LinearVelocity = pCombinedAgent->GetLinearVelocity();
 			WanderSeed.AngularVelocity = pCombinedAgent->GetAngularVelocity();
 			pWanderBehavior->SetTarget(WanderSeed);
+		}
+	}
+
+	pPriorityAgent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, FVector{300, 0, 90}, FRotator::ZeroRotator);
+	if (IsValid(pPriorityAgent))
+	{
+		pPriorityAgent->SetSteeringBehavior(pPrioritySteering.get());
+		pPriorityAgent->SetDebugRenderingEnabled(CanDebugRender);
+
+		if (pPriorityWanderBehavior)
+		{
+			FTargetData WanderSeed{};
+			WanderSeed.Position = pPriorityAgent->GetPosition();
+			WanderSeed.Orientation = pPriorityAgent->GetRotation();
+			WanderSeed.LinearVelocity = pPriorityAgent->GetLinearVelocity();
+			WanderSeed.AngularVelocity = pPriorityAgent->GetAngularVelocity();
+			pPriorityWanderBehavior->SetTarget(WanderSeed);
 		}
 	}
 }
@@ -101,6 +124,10 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 			{
 				pCombinedAgent->SetDebugRenderingEnabled(CanDebugRender);
 			}
+			if (IsValid(pPriorityAgent))
+			{
+				pPriorityAgent->SetDebugRenderingEnabled(CanDebugRender);
+			}
 		}
 		ImGui::Checkbox("Trim World", &TrimWorld->bShouldTrimWorld);
 		if (TrimWorld->bShouldTrimWorld)
@@ -131,80 +158,97 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 	}
 #pragma endregion
 	// Combined Steering Update
-	if (!pBlendedSteering)
-		return;
-
-	if (!IsValid(pCombinedAgent))
-		return;
-
-	// Mouse clicks update MouseTarget in BP; only Seek should use it.
-	if (pSeekBehavior)
+	if (pBlendedSteering && IsValid(pCombinedAgent))
 	{
-		pSeekBehavior->SetTarget(MouseTarget);
-	}
-
-	if (pCombinedAgent->GetDebugRenderingEnabled() && pSeekBehavior)
-	{
-		const FVector AgentLocation = pCombinedAgent->GetActorLocation();
-
-		const auto SeekTarget2D = pSeekBehavior->GetTarget().Position;
-		const FVector SeekTarget{
-			SeekTarget2D.X,
-			SeekTarget2D.Y,
-			AgentLocation.Z
-		};
-
-		// Seek target debug
-		DrawDebugLine(GetWorld(), AgentLocation, SeekTarget, FColor::Cyan);
-		DrawDebugPoint(GetWorld(), SeekTarget, 10.f, FColor::Cyan);
-
-		// Forward direction debug
-		const FVector ForwardEnd = AgentLocation + (pCombinedAgent->GetActorForwardVector() * 100.f);
-		DrawDebugLine(GetWorld(), AgentLocation, ForwardEnd, FColor::Yellow);
-
-		// Current movement direction debug (where the agent is going)
-		const auto LinearVelocity = pCombinedAgent->GetLinearVelocity();
-		FVector MovementDirection{LinearVelocity.X, LinearVelocity.Y, 0.f};
-		if (!MovementDirection.IsNearlyZero())
+		// Mouse clicks update MouseTarget in BP; only Seek should use it.
+		if (pSeekBehavior)
 		{
-			MovementDirection.Normalize();
-			const FVector MovementEnd = AgentLocation + (MovementDirection * 120.f);
-			DrawDebugLine(GetWorld(), AgentLocation, MovementEnd, FColor::Green);
+			pSeekBehavior->SetTarget(MouseTarget);
 		}
-	}
-
-	pCombinedAgent->SetSteeringBehavior(pBlendedSteering.get());
-
-	// Also feed another steering agent (if present) to evade in the blend.
-	if (pEvadeBehavior)
-	{
-		TArray<AActor*> SteeringActors{};
-		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ASteeringAgent::StaticClass(), SteeringActors);
-		ASteeringAgent* WandererAgent = nullptr;
-		for (AActor* const Actor : SteeringActors)
+		
+		if (pCombinedAgent->GetDebugRenderingEnabled() && pSeekBehavior)
 		{
-			ASteeringAgent* const Candidate = Cast<ASteeringAgent>(Actor);
-			if (IsValid(Candidate) && Candidate != pCombinedAgent)
+			const FVector AgentLocation = pCombinedAgent->GetActorLocation();
+	
+			const auto SeekTarget2D = pSeekBehavior->GetTarget().Position;
+			const FVector SeekTarget{
+				SeekTarget2D.X,
+				SeekTarget2D.Y,
+				AgentLocation.Z
+			};
+	
+			// Seek target debug
+			DrawDebugLine(GetWorld(), AgentLocation, SeekTarget, FColor::Cyan);
+			DrawDebugPoint(GetWorld(), SeekTarget, 10.f, FColor::Cyan);
+	
+			// Forward direction debug
+			const FVector ForwardEnd = AgentLocation + (pCombinedAgent->GetActorForwardVector() * 100.f);
+			DrawDebugLine(GetWorld(), AgentLocation, ForwardEnd, FColor::Yellow);
+	
+			// Current movement direction debug (where the agent is going)
+			const auto LinearVelocity = pCombinedAgent->GetLinearVelocity();
+			FVector MovementDirection{LinearVelocity.X, LinearVelocity.Y, 0.f};
+			if (!MovementDirection.IsNearlyZero())
 			{
-				WandererAgent = Candidate;
-				break;
+				MovementDirection.Normalize();
+				const FVector MovementEnd = AgentLocation + (MovementDirection * 120.f);
+				DrawDebugLine(GetWorld(), AgentLocation, MovementEnd, FColor::Green);
 			}
 		}
 
-		if (!IsValid(WandererAgent))
-			return;
-
-		FTargetData WandererTarget{};
-		WandererTarget.Position = WandererAgent->GetPosition();
-		WandererTarget.Orientation = WandererAgent->GetRotation();
-		WandererTarget.LinearVelocity = WandererAgent->GetLinearVelocity();
-		WandererTarget.AngularVelocity = WandererAgent->GetAngularVelocity();
-		pEvadeBehavior->SetTargetAgent(WandererAgent);
-		pEvadeBehavior->SetTarget(WandererTarget);
+		pCombinedAgent->SetSteeringBehavior(pBlendedSteering.get());
 	}
 	
-	// Wander intentionally does not use MouseTarget; it keeps/generates
-	// its own target internally in Wander::CalculateSteering.
+	// Priority Steering Update (second agent)
+	if (pPrioritySteering && IsValid(pPriorityAgent))
+	{
+		if (pPrioritySeekBehavior)
+		{
+			pPrioritySeekBehavior->SetTarget(MouseTarget);
+		}
+
+		if (pPriorityEvadeBehavior && IsValid(pCombinedAgent))
+		{
+			FTargetData CombinedTarget{};
+			CombinedTarget.Position = pCombinedAgent->GetPosition();
+			CombinedTarget.Orientation = pCombinedAgent->GetRotation();
+			CombinedTarget.LinearVelocity = pCombinedAgent->GetLinearVelocity();
+			CombinedTarget.AngularVelocity = pCombinedAgent->GetAngularVelocity();
+			pPriorityEvadeBehavior->SetTargetAgent(pCombinedAgent);
+			pPriorityEvadeBehavior->SetTarget(CombinedTarget);
+		}
+
+		if (pPriorityAgent->GetDebugRenderingEnabled() && pPrioritySeekBehavior)
+		{
+			const FVector AgentLocation = pPriorityAgent->GetActorLocation();
+			const auto SeekTarget2D = pPrioritySeekBehavior->GetTarget().Position;
+			const FVector SeekTarget{
+				SeekTarget2D.X,
+				SeekTarget2D.Y,
+				AgentLocation.Z
+			};
+
+			// Priority seek target debug
+			DrawDebugLine(GetWorld(), AgentLocation, SeekTarget, FColor::Blue);
+			DrawDebugPoint(GetWorld(), SeekTarget, 10.f, FColor::Blue);
+
+			// Priority forward direction debug
+			const FVector ForwardEnd = AgentLocation + (pPriorityAgent->GetActorForwardVector() * 100.f);
+			DrawDebugLine(GetWorld(), AgentLocation, ForwardEnd, FColor::Yellow);
+
+			// Priority movement direction debug
+			const auto LinearVelocity = pPriorityAgent->GetLinearVelocity();
+			FVector MovementDirection{LinearVelocity.X, LinearVelocity.Y, 0.f};
+			if (!MovementDirection.IsNearlyZero())
+			{
+				MovementDirection.Normalize();
+				const FVector MovementEnd = AgentLocation + (MovementDirection * 120.f);
+				DrawDebugLine(GetWorld(), AgentLocation, MovementEnd, FColor::Green);
+			}
+		}
+
+		pPriorityAgent->SetSteeringBehavior(pPrioritySteering.get());
+	}
 }
 
 

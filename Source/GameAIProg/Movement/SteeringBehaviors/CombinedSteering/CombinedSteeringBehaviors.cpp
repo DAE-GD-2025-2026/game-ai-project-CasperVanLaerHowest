@@ -47,14 +47,22 @@ float* BlendedSteering::GetWeight(ISteeringBehavior* const SteeringBehavior)
 //PRIORITY STEERING
 SteeringOutput PrioritySteering::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 {
-	SteeringOutput Steering = {};
+	SteeringOutput Steering{};
+	Steering.IsValid = false;
 
 	for (ISteeringBehavior* const pBehavior : m_PriorityBehaviors)
 	{
+		if (!pBehavior)
+			continue;
+
 		Steering = pBehavior->CalculateSteering(DeltaT, Agent);
 
-		if (Steering.IsValid)
+		// Take the first behavior that actually moves the agent.
+		if (Steering.LinearVelocity.SizeSquared() > KINDA_SMALL_NUMBER)
+		{
+			Steering.IsValid = true;
 			break;
+		}
 	}
 
 	//If non of the behavior return a valid output, last behavior is returned
