@@ -160,10 +160,15 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 	// Combined Steering Update
 	if (pBlendedSteering && IsValid(pCombinedAgent))
 	{
-		// Mouse clicks update MouseTarget in BP; only Seek should use it.
-		if (pSeekBehavior)
+		// Seek should track the other agent, not the mouse.
+		if (pSeekBehavior && IsValid(pPriorityAgent))
 		{
-			pSeekBehavior->SetTarget(MouseTarget);
+			FTargetData OtherAgentTarget{};
+			OtherAgentTarget.Position = pPriorityAgent->GetPosition();
+			OtherAgentTarget.Orientation = pPriorityAgent->GetRotation();
+			OtherAgentTarget.LinearVelocity = pPriorityAgent->GetLinearVelocity();
+			OtherAgentTarget.AngularVelocity = pPriorityAgent->GetAngularVelocity();
+			pSeekBehavior->SetTarget(OtherAgentTarget);
 		}
 		
 		if (pCombinedAgent->GetDebugRenderingEnabled() && pSeekBehavior)
@@ -250,5 +255,4 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 		pPriorityAgent->SetSteeringBehavior(pPrioritySteering.get());
 	}
 }
-
 

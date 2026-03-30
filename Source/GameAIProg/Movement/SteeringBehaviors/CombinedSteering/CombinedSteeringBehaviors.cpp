@@ -22,6 +22,13 @@ SteeringOutput BlendedSteering::CalculateSteering(float DeltaT, ASteeringAgent& 
 		const SteeringOutput BehaviorOutput = WeightedBehavior.pBehavior->CalculateSteering(DeltaT, Agent);
 		BlendedOutput.LinearVelocity += BehaviorOutput.LinearVelocity * WeightedBehavior.Weight;
 		BlendedOutput.AngularVelocity += BehaviorOutput.AngularVelocity * WeightedBehavior.Weight;
+		TotalWeight += WeightedBehavior.Weight;
+	}
+
+	if (TotalWeight > KINDA_SMALL_NUMBER)
+	{
+		BlendedOutput.LinearVelocity /= TotalWeight;
+		BlendedOutput.AngularVelocity /= TotalWeight;
 	}
 
 	return BlendedOutput;
@@ -57,8 +64,10 @@ SteeringOutput PrioritySteering::CalculateSteering(float DeltaT, ASteeringAgent&
 
 		Steering = pBehavior->CalculateSteering(DeltaT, Agent);
 
-		// Take the first behavior that actually moves the agent.
-		if (Steering.LinearVelocity.SizeSquared() > KINDA_SMALL_NUMBER)
+		// Take the first behavior that actually moves or rotates the agent.
+		if (Steering.IsValid &&
+			(Steering.LinearVelocity.SizeSquared() > KINDA_SMALL_NUMBER ||
+				FMath::Abs(Steering.AngularVelocity) > KINDA_SMALL_NUMBER))
 		{
 			Steering.IsValid = true;
 			break;

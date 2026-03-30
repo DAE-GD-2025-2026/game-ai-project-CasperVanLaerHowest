@@ -139,33 +139,26 @@ SteeringOutput Wander::CalculateSteering(float deltaT, ASteeringAgent& Agent)
 {
     SteeringOutput steering{};
 
-    const FVector2D toTarget = m_Target - Agent.GetPosition();
-    if (!m_HasTarget || toTarget.Size() < 1.f)
-    {
-        const float yawRadians = FMath::DegreesToRadians(Agent.GetRotation());
-        FVector2D forward(
-            FMath::Cos(yawRadians),
-            FMath::Sin(yawRadians)
-        );
+    const float yawRadians = FMath::DegreesToRadians(Agent.GetRotation());
+    FVector2D forward(
+        FMath::Cos(yawRadians),
+        FMath::Sin(yawRadians)
+    );
 
-        FVector2D point = Agent.GetPosition() + (forward * m_OffsetDistance);
+    const FVector2D circleCenter = Agent.GetPosition() + (forward * m_OffsetDistance);
 
-        // Keep changing direction gradually instead of picking a fresh absolute
-        // heading every time a new wander target is generated.
-        const float randomDelta = FMath::RandRange(-m_MaxAngleChange, m_MaxAngleChange);
-        m_WanderAngle += randomDelta;
+    // Jitter the wander angle a bit each frame.
+    const float randomDelta = FMath::RandRange(-m_MaxAngleChange, m_MaxAngleChange);
+    m_WanderAngle += randomDelta;
+    m_WanderAngle = FMath::UnwindRadians(m_WanderAngle);
 
-        FVector2D newForward(
-            FMath::Cos(yawRadians + m_WanderAngle),
-            FMath::Sin(yawRadians + m_WanderAngle)
-        );
+    const FVector2D circleDir(
+        FMath::Cos(yawRadians + m_WanderAngle),
+        FMath::Sin(yawRadians + m_WanderAngle)
+    );
 
-        FVector2D newPoint = point + (newForward * m_Radius);
-        m_Target = newPoint;
-        FTargetData NewtargetData(newPoint);
-        //SetTarget(NewtargetData);
-        m_HasTarget = true;
-    }
+    m_Target = circleCenter + (circleDir * m_Radius);
+    m_HasTarget = true;
 
     steering.LinearVelocity = (m_Target - Agent.GetPosition()).GetSafeNormal() * Agent.GetMaxLinearSpeed();
     return steering;
