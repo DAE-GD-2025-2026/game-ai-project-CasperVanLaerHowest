@@ -15,13 +15,58 @@ Flock::Flock(
 	, pAgentToEvade{pAgentToEvade}
 {
 	Agents.SetNum(FlockSize);
+	
+	// 1. Create behaviors
+	pSeekBehavior = std::make_unique<Seek>(  );
+	pWanderBehavior = std::make_unique<Wander>();
+	pEvadeBehavior = std::make_unique<Evade>();
+	pEvadeBehavior->SetTargetAgent(pAgentToEvade);
+	
+	// 2. Create combined behaviors
+	pBlendedSteering = std::make_unique<BlendedSteering>(std::vector<BlendedSteering::WeightedBehavior>{
+		 {pSeekBehavior.get(), 0.3f},{pWanderBehavior.get(), 0.7f}});
+	pPrioritySteering = std::make_unique<PrioritySteering>(std::vector<ISteeringBehavior*>{pEvadeBehavior.get(),
+		pBlendedSteering.get()});
 
- // TODO: initialize the flock and the memory pool
+	// 3. Create agents in flock
+	for (int i = 0; i < FlockSize; ++i)
+	{
+		const double PosRandX{static_cast<double>(FMath::FRandRange(-WorldSize, WorldSize))};
+		const double PosRandY{static_cast<double>(FMath::FRandRange(-WorldSize, WorldSize))};
+		
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		
+		ASteeringAgent* Agent =
+			pWorld->SpawnActor<ASteeringAgent>(AgentClass, 
+				FVector{PosRandX, PosRandY, 90}, FRotator::ZeroRotator, Params);
+		
+		if (!Agent)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed to spawn flock agent"));
+			continue;
+		}		
+		
+		Agent->SetSteeringBehavior(pPrioritySteering.get());
+		
+		Agents[i] = std::move(Agent);
+	}
+	
+	// 4. Initialize pool
+	Neighbors.SetNum(Agents.Num());
+	NrOfNeighbors = 0;
 }
 
 Flock::~Flock()
 {
- // TODO: Cleanup any additional data
+	for (ASteeringAgent* Agent : Agents)
+	{
+		if (Agent && !Agent->IsPendingKillPending())
+		{
+			Agent->Destroy(  );
+		}
+	}
+	Agents.Empty(  );
 }
 
 void Flock::Tick(float DeltaTime)
@@ -31,6 +76,18 @@ void Flock::Tick(float DeltaTime)
   // TODO: register the neighbors for this agent (-> fill the memory pool with the neighbors for the currently evaluated agent)
   // TODO: update the agent (-> the steeringbehaviors use the neighbors in the memory pool)
   // TODO: trim the agent to the world
+	
+	for (ASteeringAgent* ag : Agents)
+	{
+		if (!ag)
+			continue;
+		// Register the neighbors for this agent (-> fill the memory pool with the neighbors for the currently evaluated agent)
+		RegisterNeighbors( ag );
+		
+		// Update the agent -> the Steering Behaviors use the neighbors in the memory pool
+		ag->Tick( DeltaTime );
+		TrimAgentToWorld( ag );
+	}
 }
 
 void Flock::RenderDebug()
@@ -122,5 +179,28 @@ FVector2D Flock::GetAverageNeighborVelocity() const
 void Flock::SetTarget_Seek(FSteeringParams const& Target)
 {
  // TODO: Implement
+}
+
+void Flock::TrimAgentToWorld(ASteeringAgent* Agent) const
+{
+	if (!bShouldTrimWorld || !Agent)
+		return;
+	
+	FVector Pos{ Agent->GetActorLocation() };
+	
+	const float Min{ -TrimWorldSize };
+	const float Max{ TrimWorldSize };
+	
+	if (Pos.X < Min) 
+		Pos.X = Max;
+	else if (Pos.X > Max) 
+		Pos.X = Min;
+
+	if (Pos.Y < Min) 
+		Pos.Y = Max;
+	else if (Pos.Y > Max) 
+		Pos.Y = Min;
+
+	Agent->SetActorLocation(Pos);
 }
 
