@@ -103,7 +103,6 @@ SteeringOutput Pursuit::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 SteeringOutput Evade::CalculateSteering(float DeltaT, ASteeringAgent& Agent)
 {
     SteeringOutput steering{};
-    constexpr float EvadeRadius = 500.f;
 
     FTargetData targetData = Target;
     if (TargetAgent)

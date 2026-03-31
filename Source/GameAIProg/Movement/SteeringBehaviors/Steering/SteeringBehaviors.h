@@ -91,8 +91,11 @@ public:
 	ASteeringAgent* GetTargetAgent() const { return TargetAgent; }
 	SteeringOutput CalculateSteering(float DeltaT, ASteeringAgent& Agent) override;
 
+	float GetEvadeRadius() const { return EvadeRadius; }
 private:
 	ASteeringAgent* TargetAgent{nullptr}; // non-owning
+	
+	float EvadeRadius = 500.f;
 };
 
 class Wander : public Seek

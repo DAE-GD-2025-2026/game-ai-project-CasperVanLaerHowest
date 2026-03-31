@@ -76,28 +76,22 @@ Flock::~Flock()
 
 void Flock::Tick(float DeltaTime)
 {
- // TODO: update the flock
- // TODO: for every agent:
-  // TODO: register the neighbors for this agent (-> fill the memory pool with the neighbors for the currently evaluated agent)
-  // TODO: update the agent (-> the steeringbehaviors use the neighbors in the memory pool)
-  // TODO: trim the agent to the world
-	
-	for (ASteeringAgent* ag : Agents)
+	for (ASteeringAgent* agent : Agents)
 	{
-		if (!ag)
+		if (!agent)
 			continue;
-		// Register the neighbors for this agent (-> fill the memory pool with the neighbors for the currently evaluated agent)
-		RegisterNeighbors( ag );
 		
-		// Update the agent -> the Steering Behaviors use the neighbors in the memory pool
-		ag->Tick( DeltaTime );
-		TrimAgentToWorld( ag );
+		RegisterNeighbors( agent );
+		
+		agent->Tick( DeltaTime );
+		TrimAgentToWorld( agent );
 	}
 }
 
 void Flock::RenderDebug()
 {
  // TODO: Render all the agents in the flock
+	RenderNeighborhood();
 }
 
 void Flock::ImGuiRender(ImVec2 const& WindowPos, ImVec2 const& WindowSize)
@@ -137,14 +131,46 @@ void Flock::ImGuiRender(ImVec2 const& WindowPos, ImVec2 const& WindowSize)
 
 		ImGui::Text("Flocking");
 		ImGui::Spacing();
-
-  // TODO: implement ImGUI checkboxes for debug rendering here
+		
+		ImGui::Checkbox("Show Neighborhood Debug", &DebugRenderNeighborhood);
+		ImGui::Checkbox("Show Render Partitions", &DebugRenderPartitions);
+		ImGui::Checkbox("Show Steering", &DebugRenderSteering);
 
 		ImGui::Text("Behavior Weights");
 		ImGui::Spacing();
-
-  // TODO: implement ImGUI sliders for steering behavior weights here
-		//End
+		
+		auto& Weights = pBlendedSteering->GetWeightedBehaviorsRef();
+		
+		ImGuiHelpers::ImGuiSliderFloatWithSetter("Seek", Weights[0].Weight, 0.f, 1.f,
+			[&](float w)
+		{
+				Weights[0].Weight = w;
+		},"%.2f");
+		
+		ImGuiHelpers::ImGuiSliderFloatWithSetter("Wander", Weights[1].Weight, 0.f, 1.f,
+			[&](float w)
+		{
+				Weights[1].Weight = w;
+		},"%.2f");
+		
+		ImGuiHelpers::ImGuiSliderFloatWithSetter("Cohesion", Weights[2].Weight, 0.f, 1.f,
+			[&](float w)
+		{
+				Weights[2].Weight = w;
+		},"%.2f");
+		
+		ImGuiHelpers::ImGuiSliderFloatWithSetter("Separation", Weights[3].Weight, 0.f, 1.f,
+			[&](float w)
+		{
+				Weights[3].Weight = w;
+		},"%.2f");
+		
+		ImGuiHelpers::ImGuiSliderFloatWithSetter("Velocity match", Weights[4].Weight, 0.f, 1.f,
+			[&](float w)
+		{
+				Weights[4].Weight = w;
+		},"%.2f");
+		
 		ImGui::End();
 	}
 #pragma endregion
@@ -153,7 +179,45 @@ void Flock::ImGuiRender(ImVec2 const& WindowPos, ImVec2 const& WindowSize)
 
 void Flock::RenderNeighborhood()
 {
- // TODO: Debugrender the neighbors for the first agent in the flock
+	if (DebugRenderSteering)
+	{
+		DrawDebugCircle(
+				GWorld,
+				pAgentToEvade->GetActorLocation(),
+				pEvadeBehavior->GetEvadeRadius(),  
+				32, FColor::Purple, false, -1.f, 0,   
+				2.f,  FVector(1, 0, 0), FVector(0, 1, 0), true 
+			);
+	}
+	if (DebugRenderNeighborhood)
+	{
+		if (Agents.Num() == 0)
+			return;
+
+		ASteeringAgent* firstAgent{ Agents[0] };
+		if (!firstAgent)
+		{
+			RegisterNeighbors(firstAgent);
+	
+			DrawDebugCircle(
+				pWorld, firstAgent->GetActorLocation(),NeighborhoodRadius,24, FColor::Yellow,false, -1.f,0,
+				3.f,FVector(1,0,0),FVector(0,1,0),false);
+	
+			for (int i = 0; i < NrOfNeighbors; ++i)
+			{
+				if (!Neighbors[i])
+					continue;
+
+				DrawDebugSphere( pWorld,Neighbors[i]->GetActorLocation(), 35.f, 
+					8, FColor::Green,false,-1.f,0,2.f);
+			}
+		}
+	}
+	if (DebugRenderPartitions)
+	{
+		//TODO: Implement
+	}
+	
 }
 
 #ifndef GAMEAI_USE_SPACE_PARTITIONING
