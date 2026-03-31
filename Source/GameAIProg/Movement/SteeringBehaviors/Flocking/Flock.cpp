@@ -19,6 +19,8 @@ Flock::Flock(
 	// 1. Create behaviors
 	pSeekBehavior = std::make_unique<Seek>(  );
 	pWanderBehavior = std::make_unique<Wander>();
+	
+	
 	pEvadeBehavior = std::make_unique<Evade>();
 	pEvadeBehavior->SetTargetAgent(pAgentToEvade);
 	
@@ -154,15 +156,40 @@ void Flock::RenderNeighborhood()
 #ifndef GAMEAI_USE_SPACE_PARTITIONING
 void Flock::RegisterNeighbors(ASteeringAgent* const pAgent)
 {
- // TODO: Implement
+	NrOfNeighbors = 0;
+	
+	for (auto agent : Agents)
+	{
+		if (!agent)
+	 		continue;
+		
+		if (agent == pAgent)
+			continue;
+		
+		const float distance = FVector::DistSquared(agent->GetActorLocation(), pAgent->GetActorLocation());
+		
+		if (distance <= NeighborhoodRadius * NeighborhoodRadius)
+		{
+			Neighbors[NrOfNeighbors] = agent;
+			NrOfNeighbors++;
+		}
+	}
 }
 #endif
 
 FVector2D Flock::GetAverageNeighborPos() const
 {
 	FVector2D avgPosition = FVector2D::ZeroVector;
-
- // TODO: Implement
+	
+	if (NrOfNeighbors == 0)
+		return avgPosition;
+	
+	for (int i{}; i < NrOfNeighbors; i++ )
+	{
+		avgPosition += Neighbors[i]->GetPosition();
+	}
+	
+	avgPosition /= NrOfNeighbors;
 	
 	return avgPosition;
 }
@@ -171,8 +198,16 @@ FVector2D Flock::GetAverageNeighborVelocity() const
 {
 	FVector2D avgVelocity = FVector2D::ZeroVector;
 
- // TODO: Implement
+	if (NrOfNeighbors == 0)
+		return avgVelocity;
+	
+	for (int i{}; i < NrOfNeighbors; i++ )
+	{
+		avgVelocity += Neighbors[i]->GetLinearVelocity();
+	}
 
+	avgVelocity /= NrOfNeighbors;
+	
 	return avgVelocity;
 }
 
