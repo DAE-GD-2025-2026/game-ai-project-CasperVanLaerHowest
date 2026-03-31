@@ -195,12 +195,12 @@ void Flock::RenderNeighborhood()
 			return;
 
 		ASteeringAgent* firstAgent{ Agents[0] };
-		if (!firstAgent)
+		if (firstAgent)
 		{
 			RegisterNeighbors(firstAgent);
 	
 			DrawDebugCircle(
-				pWorld, firstAgent->GetActorLocation(),NeighborhoodRadius,24, FColor::Yellow,false, -1.f,0,
+				GWorld, firstAgent->GetActorLocation(),NeighborhoodRadius,32, FColor::Emerald,false, -1.f,0,
 				3.f,FVector(1,0,0),FVector(0,1,0),false);
 	
 			for (int i = 0; i < NrOfNeighbors; ++i)
@@ -208,7 +208,7 @@ void Flock::RenderNeighborhood()
 				if (!Neighbors[i])
 					continue;
 
-				DrawDebugSphere( pWorld,Neighbors[i]->GetActorLocation(), 35.f, 
+				DrawDebugSphere( GWorld,Neighbors[i]->GetActorLocation(), 35.f, 
 					8, FColor::Green,false,-1.f,0,2.f);
 			}
 		}
