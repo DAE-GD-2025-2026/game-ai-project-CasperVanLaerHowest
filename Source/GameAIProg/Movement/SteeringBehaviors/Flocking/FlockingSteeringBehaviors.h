@@ -18,26 +18,26 @@ private:
 
 //SEPARATION - FLOCKING
 //*********************
-class Separation final
+class Separation final : public Seek
 {
 public:
 	Separation(Flock* const pFlock) :pFlock(pFlock) {};
 	
 	//Separation Behavior
-	SteeringOutput CalculateSteering(float deltaT, ASteeringAgent& pAgent);
+	SteeringOutput CalculateSteering(float deltaT, ASteeringAgent& pAgent) override;
 private:
 	Flock* pFlock = nullptr;
 };
 
 //VELOCITY MATCH - FLOCKING
 //************************
-class VelocityMatch final
+class VelocityMatch final : public Seek
 {
 public:
 	VelocityMatch(Flock* const pFlock) :pFlock(pFlock) {};
 	
 	//Velocity Match Behavior
-	SteeringOutput CalculateSteering(float deltaT, ASteeringAgent& pAgent);
+	SteeringOutput CalculateSteering(float deltaT, ASteeringAgent& pAgent) override;
 private:
 	Flock* pFlock = nullptr;
 };

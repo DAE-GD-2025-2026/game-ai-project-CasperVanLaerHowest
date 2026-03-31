@@ -19,14 +19,17 @@ Flock::Flock(
 	// 1. Create behaviors
 	pSeekBehavior = std::make_unique<Seek>(  );
 	pWanderBehavior = std::make_unique<Wander>();
-	
-	
+	pCohesionBehavior = std::make_unique<Cohesion>(this);
+	pSeparationBehavior = std::make_unique<Separation>(this);
+	pVelMatchBehavior = std::make_unique<VelocityMatch>(this);
 	pEvadeBehavior = std::make_unique<Evade>();
 	pEvadeBehavior->SetTargetAgent(pAgentToEvade);
 	
 	// 2. Create combined behaviors
 	pBlendedSteering = std::make_unique<BlendedSteering>(std::vector<BlendedSteering::WeightedBehavior>{
-		 {pSeekBehavior.get(), 0.3f},{pWanderBehavior.get(), 0.7f}});
+		 {pSeekBehavior.get(), 0.1f},{pWanderBehavior.get(), 0.4f},
+		{pCohesionBehavior.get(), 0.2f},{pSeparationBehavior.get(), 0.1f},
+		{pVelMatchBehavior.get(), 0.2f}});
 	pPrioritySteering = std::make_unique<PrioritySteering>(std::vector<ISteeringBehavior*>{pEvadeBehavior.get(),
 		pBlendedSteering.get()});
 
