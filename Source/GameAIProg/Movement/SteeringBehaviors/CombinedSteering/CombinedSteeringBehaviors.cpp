@@ -30,6 +30,10 @@ SteeringOutput BlendedSteering::CalculateSteering(float DeltaT, ASteeringAgent& 
 		BlendedOutput.LinearVelocity /= TotalWeight;
 		BlendedOutput.AngularVelocity /= TotalWeight;
 	}
+	
+	//BlendedOutput.LinearVelocity.Normalize();
+	//BlendedOutput.LinearVelocity *= Agent.GetMaxLinearSpeed();
+	BlendedOutput.IsValid = true;
 
 	return BlendedOutput;
 }

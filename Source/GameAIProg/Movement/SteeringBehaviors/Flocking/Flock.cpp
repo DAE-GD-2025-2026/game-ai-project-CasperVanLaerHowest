@@ -3,6 +3,7 @@
 #include "Shared/ImGuiHelpers.h"
 
 
+
 Flock::Flock(
 	UWorld* pWorld,
 	TSubclassOf<ASteeringAgent> AgentClass,
@@ -13,8 +14,12 @@ Flock::Flock(
 	: pWorld{pWorld}
 	, FlockSize{ FlockSize }
 	, pAgentToEvade{pAgentToEvade}
+	, TrimWorldSize{WorldSize}
+	, bShouldTrimWorld{bTrimWorld}
 {
 	Agents.SetNum(FlockSize);
+	
+	pPartitionedSpace = std::make_unique<CellSpace>(pWorld, WorldSize, WorldSize, 10, 10, FlockSize);
 	
 	// 1. Create behaviors
 	pSeekBehavior = std::make_unique<Seek>(  );
@@ -54,11 +59,24 @@ Flock::Flock(
 		
 		Agent->SetSteeringBehavior(pPrioritySteering.get());
 		
+		Agent->SetActorTickEnabled(false);
+		
 		Agents[i] = std::move(Agent);
+		
 	}
 	
 	// 4. Initialize pool
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+	for (auto agent : Agents)
+		{
+			if (!agent)
+				continue;
+			pPartitionedSpace->AddAgent(*agent);
+		}
+#else
 	Neighbors.SetNum(Agents.Num());
+#endif
+	
 	NrOfNeighbors = 0;
 }
 
@@ -81,10 +99,21 @@ void Flock::Tick(float DeltaTime)
 		if (!agent)
 			continue;
 		
-		RegisterNeighbors( agent );
+#ifdef GAMEAI_USE_SPACE_PARTITIONING 
+		const auto oldpos = agent->GetPosition();
+		pPartitionedSpace->RegisterNeighbors(*agent, NeighborhoodRadius);
+#else
+	RegisterNeighbors( agent );
+#endif
+		
 		
 		agent->Tick( DeltaTime );
+		
 		TrimAgentToWorld( agent );
+
+#ifdef GAMEAI_USE_SPACE_PARTITIONING 
+		pPartitionedSpace->UpdateAgentCell(*agent, oldpos);
+#endif
 	}
 }
 
@@ -197,25 +226,45 @@ void Flock::RenderNeighborhood()
 		ASteeringAgent* firstAgent{ Agents[0] };
 		if (firstAgent)
 		{
-			RegisterNeighbors(firstAgent);
-	
+		#ifdef GAMEAI_USE_SPACE_PARTITIONING
+			pPartitionedSpace->RegisterNeighbors(*firstAgent,NeighborhoodRadius);
+			
 			DrawDebugCircle(
-				GWorld, firstAgent->GetActorLocation(),NeighborhoodRadius,32, FColor::Emerald,false, -1.f,0,
-				3.f,FVector(1,0,0),FVector(0,1,0),false);
-	
+					GWorld, firstAgent->GetActorLocation(),NeighborhoodRadius,32, FColor::Emerald,false, -1.f,0,
+					3.f,FVector(1,0,0),FVector(0,1,0),false);
+			
+			DrawDebugBox(GWorld,firstAgent->GetActorLocation(),{NeighborhoodRadius,NeighborhoodRadius,0},FColor::Cyan,false,-1.f,0,2.f);
+    	
 			for (int i = 0; i < NrOfNeighbors; ++i)
 			{
-				if (!Neighbors[i])
+				if (!pPartitionedSpace->GetNeighbors()[i])
 					continue;
-
-				DrawDebugSphere( GWorld,Neighbors[i]->GetActorLocation(), 35.f, 
+    
+				DrawDebugSphere( GWorld,pPartitionedSpace->GetNeighbors()[i]->GetActorLocation(), 35.f, 
 					8, FColor::Green,false,-1.f,0,2.f);
 			}
+		#else
+			RegisterNeighbors(firstAgent);
+    	
+    			DrawDebugCircle(
+    				GWorld, firstAgent->GetActorLocation(),NeighborhoodRadius,32, FColor::Emerald,false, -1.f,0,
+    				3.f,FVector(1,0,0),FVector(0,1,0),false);
+    	
+    			for (int i = 0; i < NrOfNeighbors; ++i)
+    			{
+    				if (!Neighbors[i])
+    					continue;
+    
+    				DrawDebugSphere( GWorld,Neighbors[i]->GetActorLocation(), 35.f, 
+    					8, FColor::Green,false,-1.f,0,2.f);
+    			}
+		#endif
 		}
 	}
 	if (DebugRenderPartitions)
 	{
 		//TODO: Implement
+		pPartitionedSpace->RenderCells();
 	}
 	
 }
@@ -251,10 +300,15 @@ FVector2D Flock::GetAverageNeighborPos() const
 	if (NrOfNeighbors == 0)
 		return avgPosition;
 	
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+
+#else
 	for (int i{}; i < NrOfNeighbors; i++ )
-	{
-		avgPosition += Neighbors[i]->GetPosition();
-	}
+    	{
+    		avgPosition += Neighbors[i]->GetPosition();
+    	}
+#endif
+	
 	
 	avgPosition /= NrOfNeighbors;
 	
@@ -268,10 +322,15 @@ FVector2D Flock::GetAverageNeighborVelocity() const
 	if (NrOfNeighbors == 0)
 		return avgVelocity;
 	
+#ifdef GAMEAI_USE_SPACE_PARTITIONING
+
+#else
 	for (int i{}; i < NrOfNeighbors; i++ )
-	{
-		avgVelocity += Neighbors[i]->GetLinearVelocity();
-	}
+    	{
+    		avgVelocity += Neighbors[i]->GetLinearVelocity();
+    	}
+#endif
+	
 
 	avgVelocity /= NrOfNeighbors;
 	
@@ -280,7 +339,8 @@ FVector2D Flock::GetAverageNeighborVelocity() const
 
 void Flock::SetTarget_Seek(FSteeringParams const& Target)
 {
- // TODO: Implement
+
+	pSeekBehavior->SetTarget(Target);
 }
 
 void Flock::TrimAgentToWorld(ASteeringAgent* Agent) const
