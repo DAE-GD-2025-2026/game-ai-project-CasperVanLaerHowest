@@ -74,6 +74,11 @@ void CellSpace::UpdateAgentCell(ASteeringAgent& Agent, const FVector2D& OldPos)
 	const int oldIndex = PositionToIndex(OldPos);
 	const int newIndex = PositionToIndex(newPos);
 	
+	
+	if (oldIndex != newIndex)
+		UE_LOG(LogTemp, Warning, TEXT("Agent moved : %d -> %d"), oldIndex, newIndex);
+	
+	
 	if (oldIndex == newIndex)
 		return;
 	
@@ -82,6 +87,8 @@ void CellSpace::UpdateAgentCell(ASteeringAgent& Agent, const FVector2D& OldPos)
 	
 	if (newIndex != -1)
 		Cells[newIndex].Agents.push_back(&Agent);
+	
+	
 	
 }
 
@@ -107,6 +114,8 @@ void CellSpace::RegisterNeighbors(ASteeringAgent& Agent, float QueryRadius)
 		
 				if (distance <= QueryRadius * QueryRadius)
 				{
+					if (NrOfNeighbors >= Neighbors.Num())
+						return;
 					Neighbors[NrOfNeighbors] = agent;
 					NrOfNeighbors++;
 				}
@@ -149,7 +158,7 @@ void CellSpace::RenderCells() const
 		};
 		const FVector textLocation{ center2D.X, center2D.Y, 10.f };
 		const FString agentCountText = FString::Printf(TEXT("%d"), static_cast<int>(c.Agents.size()));
-		DrawDebugString(pWorld, textLocation, agentCountText, nullptr, FColor::White, -1.f, false, 1.f);
+		DrawDebugString(pWorld, textLocation, agentCountText, nullptr, FColor::White, 0.f, false, 1.f);
 	}
 }
 

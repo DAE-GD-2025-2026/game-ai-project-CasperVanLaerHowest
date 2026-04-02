@@ -35,8 +35,8 @@ SteeringOutput Separation::CalculateSteering(float deltaT, ASteeringAgent& pAgen
 	
 	FVector2D force{ 0.f };
 	const auto& Neighbors{pFlock->GetNeighbors()};
-	
-	for (int i{}; i < pFlock->GetNrOfNeighbors(); i++)
+	const int neighborCount = FMath::Min(pFlock->GetNrOfNeighbors(), Neighbors.Num());
+	for (int i{}; i < neighborCount; i++)
 	{
 		const auto neighbourToAgent = pAgent.GetPosition() - Neighbors[i]->GetPosition();
 		
