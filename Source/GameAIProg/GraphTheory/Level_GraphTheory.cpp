@@ -42,12 +42,39 @@ void ALevel_GraphTheory::BeginPlay()
 		Player->SetCameraProjection(ECameraProjectionMode::Orthographic);
 	}
 	
+	
+	FVector2D pos1{0,0};
+	FVector2D pos2{100,0};
+	FVector2D pos3{100,100};
+	FVector2D pos4{0,100};
+	
+	std::unique_ptr<Node> node1 = std::make_unique<Node>(pos1);
+	std::unique_ptr<Node> node2 = std::make_unique<Node>(pos2);
+	std::unique_ptr<Node> node3 = std::make_unique<Node>(pos3);
+	std::unique_ptr<Node> node4 = std::make_unique<Node>(pos4);
 	// TODO Make the graph and a couple connected nodes here...
+	Graph.AddNode(std::move(node1));
+	Graph.AddNode(std::move(node2));
+	Graph.AddNode(std::move(node3));
+	Graph.AddNode(std::move(node4));
+	
+	Graph.AddConnection(0,1);
+	Graph.AddConnection(1,2);
+	Graph.AddConnection(2,3);
+	Graph.AddConnection(3,0);
 	
 	// Spawn the Agent
 	Agent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, 
 	FVector{0,0,90}, FRotator::ZeroRotator);
 	Agent->SetSteeringBehavior(&PathFollow);
+	
+	EulerianPath euler(&Graph);
+	Eulerianity state = euler.IsEulerian();
+	const std::vector<Node*> trail = euler.FindPath(state);
+	if (!trail.empty())
+	{
+		UpdateAgentPath(trail);
+	}
 }
 
 void ALevel_GraphTheory::BeginDestroy()
@@ -101,6 +128,21 @@ void ALevel_GraphTheory::Tick(float DeltaTime)
 	Renderer.RenderGraph(Graph);
 	
 	// TODO Check if the graph has updated
+	
+	if (PlayerGraphEditor && PlayerGraphEditor->HasGraphUpdated())
+	{
+		EulerianPath euler(&Graph);
+		Eulerianity state = euler.IsEulerian();
+		const std::vector<Node*> trail = euler.FindPath(state);
+		if (!trail.empty())
+		{
+			UpdateAgentPath(trail);
+		}
+	}
+	
+	Agent->Tick(DeltaTime);
+	
+	
 	// TODO if so, run the EulerianPath algorithm
 	// TODO if a path is found, have the agent follow it
 }
@@ -109,6 +151,10 @@ void ALevel_GraphTheory::UpdateAgentPath(std::vector<Node*> const& Trail)
 {
 	std::vector<FVector2D> path{};
 	
+	for (auto const& Node : Trail)
+	{
+		path.emplace_back(Node->GetPosition());
+	}
 	// TODO convert Node vector to positions vector
 
 	PathFollow.SetPath(path);

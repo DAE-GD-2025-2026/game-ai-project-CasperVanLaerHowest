@@ -33,7 +33,9 @@ namespace GameAI
 
 	inline Eulerianity EulerianPath::IsEulerian() const
 	{
-		// TODO If the graph is not connected, there can be no Eulerian Trail
+		// If the graph is not connected, there can be no Eulerian Trail
+		if (!IsConnected())
+			return Eulerianity::notEulerian;
 		if (m_pGraph->GetConnections().size() < 1)
 			return Eulerianity::notEulerian;
 		// TODO Count nodes with odd degree 
@@ -77,12 +79,79 @@ namespace GameAI
 		
 		// TODO Check if there can be an Euler path
 		// TODO If this graph is not eulerian, return the empty path
-		
-		
+		//auto euler = IsEulerian();
+		switch (eulerianity)
+		{
+		case Eulerianity::notEulerian :
+			{
+				return Path;
+			}
+		case Eulerianity::semiEulerian :
+			{
+				for (auto node : Nodes)
+				{
+					if (graphCopy.FindConnectionsFrom(node->GetId()).size() % 2 == 1)
+					{
+						currentNodeId = node->GetId();
+						break;
+					}
+				}
+				break;
+			}
+		case Eulerianity::eulerian :
+			{
+				for (auto node : Nodes)
+				{
+					if (!graphCopy.FindConnectionsFrom(node->GetId()).empty())
+					{
+						currentNodeId = node->GetId();
+						break;
+					}
+				}
+				break;
+			}
+		default :
+			{
+				return Path;
+			}
+		}
+		if (currentNodeId == Graphs::InvalidNodeId)
+			return Path;
 		// TODO Start algorithm loop
 		std::stack<int> nodeStack;
+		std::vector<int> pathIds{};
 
-		std::reverse(Path.begin(), Path.end());
+		while (!nodeStack.empty() || !graphCopy.FindConnectionsFrom(currentNodeId).empty())
+		{
+			if (graphCopy.FindConnectionsFrom(currentNodeId).empty())
+			{
+				pathIds.emplace_back(currentNodeId);
+				currentNodeId = nodeStack.top();
+				nodeStack.pop();
+			}
+			else
+			{
+				nodeStack.push(currentNodeId);
+				auto* connection = graphCopy.FindConnectionsFrom(currentNodeId)[0];
+				const int nextNodeId = connection->GetToId();
+				graphCopy.RemoveConnection(currentNodeId, nextNodeId);
+				currentNodeId = nextNodeId;
+			}
+		}
+		pathIds.emplace_back(currentNodeId);
+
+		Path.reserve(pathIds.size());
+		for (int nodeId : pathIds)
+		{
+			if (nodeId < 0 || nodeId >= static_cast<int>(m_pGraph->GetNodes().size()))
+				continue;
+			auto& nodePtr = m_pGraph->GetNode(nodeId);
+			if (nodePtr && nodePtr->GetId() != Graphs::InvalidNodeId)
+			{
+				Path.emplace_back(nodePtr.get());
+			}
+		}
+
 		return Path;
 	}
 
