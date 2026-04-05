@@ -87,21 +87,36 @@ void ALevel_Navmesh::Tick(float DeltaTime)
 	
 	if (bDrawPath)
 	{
+		const float pathDrawZ = Agent ? Agent->GetActorLocation().Z + 10.0f : 50.0f;
+
 		for (int PathIdx = 1; PathIdx < DebugDrawPath.size(); ++PathIdx)
 		{
 			DrawDebugLine(
 				GetWorld(), 
-				FVector{DebugDrawPath[PathIdx - 1], 5.0f}, 
-				FVector{DebugDrawPath[PathIdx], 5.0f}, 
+				FVector{DebugDrawPath[PathIdx - 1], pathDrawZ}, 
+				FVector{DebugDrawPath[PathIdx], pathDrawZ}, 
 				FColor::Magenta, false, -1, 1, 10);
+		}
+
+		if (DebugDrawPath.size() == 1)
+		{
+			DrawDebugPoint(GetWorld(), FVector{DebugDrawPath[0], pathDrawZ}, 14.0f, FColor::Magenta);
 		}
 	}
 	
-	// Todo: Draw the portals travelled through with SSFA
-	// if (bDrawPortals)
-	// {
-	// 	
-	// }
+	if (bDrawPortals)
+	{
+		const float portalDrawZ = Agent ? Agent->GetActorLocation().Z + 10.0f : 50.0f;
+
+		for (const GameAI::NavLine& Portal : DebugDrawPortals)
+		{
+			DrawDebugLine(
+				GetWorld(),
+				FVector{Portal.P1, portalDrawZ},
+				FVector{Portal.P2, portalDrawZ},
+				FColor::Cyan, false, -1, 1, 5);
+		}
+	}
 	
 	UpdateImGui();
 }
