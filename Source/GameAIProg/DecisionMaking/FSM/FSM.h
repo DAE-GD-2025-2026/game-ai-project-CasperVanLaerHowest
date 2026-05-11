@@ -5,12 +5,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include "States/State.h"
+
 class AAIController;
 
 namespace GameAI::FSM
 {
-	class State;
-
 	struct Transition
 	{
 		State* To{nullptr};
@@ -28,6 +28,7 @@ namespace GameAI::FSM
 		void Start(AAIController& Controller);
 		void Stop(AAIController& Controller);
 		void Update(AAIController& Controller, float DeltaTime);
+		const State* GetCurrentState() const { return CurrentState; }
 
 	private:
 		std::vector<std::unique_ptr<State>> States{};

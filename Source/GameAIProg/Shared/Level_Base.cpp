@@ -1,4 +1,6 @@
-﻿#include "Level_Base.h"
+#include "Level_Base.h"
+#include "NavMesh/NavMeshBoundsVolume.h"
+#include "EngineUtils.h"
 
 // Sets default values
 ALevel_Base::ALevel_Base()
@@ -21,8 +23,8 @@ void ALevel_Base::BeginPlay()
 	FImGuiModule::Get().GetProperties().SetGamepadNavigationEnabled(false);
 
 	// Spawn our trimworld
-	TrimWorld = GetWorld()->SpawnActor<AWorldTrimVolume>(FVector{0,0,0}, FRotator::ZeroRotator);
-	
+	TrimWorld = GetWorld()->SpawnActor<AWorldTrimVolume>(FVector{0, 0, 0}, FRotator::ZeroRotator);
+
 	// Get needed InputBinding vars
 	SetupEnhancedInputAttachment();
 	if (CanBindLevelInput())
@@ -41,7 +43,7 @@ void ALevel_Base::Tick(float DeltaTime)
 	GetWorld()->GetGameViewport()->GetViewportSize(ViewportSize);
 	WindowSize = {MenuWidth, static_cast<float>(ViewportSize.Y) - 20};
 	WindowPos = {static_cast<float>(ViewportSize.X) - MenuWidth - 10, 10};
-	
+
 	// Update mousepos
 	UpdateLatestMouseWorldPos();
 
@@ -59,17 +61,17 @@ void ALevel_Base::SetupEnhancedInputAttachment()
 {
 	PlayerController = GetWorld()->GetFirstPlayerController();
 	if (!PlayerController) return;
-	
+
 	PlayerEnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerController->InputComponent);
 	if (!PlayerEnhancedInputComponent)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Player Controller is not using Enhanced Input." "Set InputComponentClass to UEnhancedInputComponent."));
 		return;
 	}
-	
+
 	ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer();
 	if (!LocalPlayer) return;
-	
+
 	EnhancedInputSubsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
 	if (!EnhancedInputSubsystem) return;
 }
@@ -79,9 +81,9 @@ void ALevel_Base::BindLevelInputMappingContexts()
 	for (auto& InputMappingContextPair : InputMappingContexts)
 	{
 		// Bind mappings at priority, these will be always active
-		EnhancedInputSubsystem->AddMappingContext(InputMappingContextPair.InputMappingContext, 
+		EnhancedInputSubsystem->AddMappingContext(InputMappingContextPair.InputMappingContext,
 			InputMappingContextPair.Priority);
-		
+
 		// Conditional actions are your own responsibility
 	}
 }
@@ -99,21 +101,24 @@ std::optional<FVector> ALevel_Base::GetMouseWorldPos() const
 		// we don't have a player controller to get the mouse pos from!
 		return std::nullopt;
 	}
-	
+
 	FVector MouseWorldPos{};
 	FVector MouseWorldDirection{};
-	PlayerController->DeprojectMousePositionToWorld(MouseWorldPos, MouseWorldDirection);
-	
+	if (!PlayerController->DeprojectMousePositionToWorld(MouseWorldPos, MouseWorldDirection))
+	{
+		return std::nullopt;
+	}
+
 	// TODO FIXME move to level and just provide a set latest mousepos func?
 	float MaxTraceDistance{20000.0f};
 
-	if (FHitResult HitResult{}; 
+	if (FHitResult HitResult{};
 		GetWorld()->LineTraceSingleByChannel(HitResult, MouseWorldPos,
-			MouseWorldDirection * MaxTraceDistance,ECC_Visibility))
+			MouseWorldPos + (MouseWorldDirection * MaxTraceDistance), ECC_Visibility))
 	{
 		return HitResult.Location;
 	}
-	
+
 	return std::nullopt;
 }
 
@@ -125,5 +130,25 @@ void ALevel_Base::UpdateLatestMouseWorldPos()
 	}
 }
 
+std::optional<FVector> ALevel_Base::GetNavMeshBoundsCenter(float SpawnZ) const
+{
+	if (!GetWorld())
+	{
+		return std::nullopt;
+	}
 
+	for (TActorIterator<ANavMeshBoundsVolume> It(GetWorld()); It; ++It)
+	{
+		const ANavMeshBoundsVolume* NavBounds = *It;
+		if (!IsValid(NavBounds))
+		{
+			continue;
+		}
 
+		FVector Center = NavBounds->GetComponentsBoundingBox(true).GetCenter();
+		Center.Z = SpawnZ;
+		return Center;
+	}
+
+	return std::nullopt;
+}

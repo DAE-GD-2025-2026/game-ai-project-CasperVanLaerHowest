@@ -29,8 +29,12 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	virtual void BindLevelInputActions() override;
+	void UpdateImGui();
 
 private:
+	UPROPERTY(EditAnywhere, Category="FSM|Debug")
+	float GuardDetectionRadius{1400.f};
+
 	UPROPERTY()
 	ASteeringAgent* GuardAgent{nullptr};
 	UPROPERTY()
@@ -38,4 +42,5 @@ private:
 
 	std::unique_ptr<Seek> ThiefSeek{};
 	void SetThiefTargetFromMouse();
+	bool bWasLeftMouseDown{false};
 };

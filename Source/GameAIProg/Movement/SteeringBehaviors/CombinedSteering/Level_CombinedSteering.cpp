@@ -255,4 +255,3 @@ void ALevel_CombinedSteering::Tick(float DeltaTime)
 		pPriorityAgent->SetSteeringBehavior(pPrioritySteering.get());
 	}
 }
-

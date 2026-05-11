@@ -15,6 +15,7 @@ namespace GameAI::FSM
 	public:
 		virtual ~PatrolState();
 		
+		virtual const char* GetDebugName() const override { return "Patrol"; }
 		virtual void Enter(AAIController& Controller) override;
 		virtual void Exit(AAIController& Controller) override;
 		virtual void Update(AAIController& Controller, float DeltaTime) override;

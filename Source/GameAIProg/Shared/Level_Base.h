@@ -78,4 +78,5 @@ protected:
 	
 	std::optional<FVector> GetMouseWorldPos() const;
 	void UpdateLatestMouseWorldPos();
+	std::optional<FVector> GetNavMeshBoundsCenter(float SpawnZ = 90.0f) const;
 };

@@ -33,6 +33,7 @@ void GameAI::FSM::SearchState::Enter(AAIController& Controller)
 	if (Blackboard)
 	{
 		Blackboard->SetValueAsFloat(TEXT("SearchStartTime"), Controller.GetWorld()->GetTimeSeconds());
+		Blackboard->SetValueAsBool(TEXT("SearchReachedLastKnownLocation"), false);
 		const FVector LastKnown = Blackboard->GetValueAsVector(TEXT("LastKnownTargetLocation"));
 		SeekBehavior->SetTarget(FTargetData{FVector2D{LastKnown}});
 	}
@@ -67,6 +68,10 @@ void GameAI::FSM::SearchState::Update(AAIController& Controller, float DeltaTime
 		if (ToLastKnown.SizeSquared() <= ReachDistance * ReachDistance)
 		{
 			bReachedLastKnownLocation = true;
+			if (Blackboard)
+			{
+				Blackboard->SetValueAsBool(TEXT("SearchReachedLastKnownLocation"), true);
+			}
 			Agent->SetSteeringBehavior(WanderBehavior.get());
 		}
 	}

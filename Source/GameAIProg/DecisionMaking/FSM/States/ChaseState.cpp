@@ -42,14 +42,14 @@ void GameAI::FSM::ChaseState::Update(AAIController& Controller, float DeltaTime)
 	{
 		TargetActor = Cast<AActor>(Blackboard->GetValueAsObject(TEXT("TargetActor")));
 	}
-	if (!TargetActor)
+	if (!IsValid(TargetActor))
 	{
 		APlayerController* PlayerController = Controller.GetWorld() ? Controller.GetWorld()->GetFirstPlayerController() : nullptr;
 		TargetActor = PlayerController ? PlayerController->GetPawn() : nullptr;
 	}
 
 	ASteeringAgent* Agent = Cast<ASteeringAgent>(Controller.GetPawn());
-	if (!TargetActor || !Agent || !SeekBehavior)
+	if (!IsValid(TargetActor) || !IsValid(Agent) || !SeekBehavior)
 	{
 		return;
 	}

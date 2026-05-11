@@ -7,13 +7,12 @@
 
 #include "CoreMinimal.h"
 #include "BrainComponent.h"
+#include "FSM.h"
 #include "FSMComponent.generated.h"
 
 namespace GameAI::FSM
 {
 	class State;
-	struct Transition;
-	class FSM; // contains FSM logic
 }
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -37,6 +36,7 @@ public:
 	
 	GameAI::FSM::State* AddState(std::unique_ptr<GameAI::FSM::State>&& NewState);
 	void AddTransition(GameAI::FSM::State* From, GameAI::FSM::State* To, std::function<bool()> EvalFunc);
+	const GameAI::FSM::State* GetCurrentState() const;
 		
 protected:
 	// Called when the game starts

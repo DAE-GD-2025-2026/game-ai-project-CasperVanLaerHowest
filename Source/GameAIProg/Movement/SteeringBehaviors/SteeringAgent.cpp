@@ -34,7 +34,8 @@ void ASteeringAgent::Tick(float DeltaTime)
 		const float speed = output.LinearVelocity.Size();
 		const float speedScale = maxSpeed > 0.f ? FMath::Clamp(speed / maxSpeed, 0.f, 1.f) : 0.f;
 		const FVector2D direction2D = output.LinearVelocity.GetSafeNormal();
-		AddMovementInput(FVector{direction2D, 0.f}, speedScale);
+		// Force movement input so steering remains responsive regardless of controller input-ignore flags.
+		AddMovementInput(FVector{direction2D, 0.f}, speedScale, true);
 		AddActorWorldRotation(FRotator{0.f, output.AngularVelocity * DeltaTime, 0.f});
 	
 	}

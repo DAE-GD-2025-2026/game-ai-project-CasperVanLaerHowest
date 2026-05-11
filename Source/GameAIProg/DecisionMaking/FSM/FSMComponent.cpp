@@ -99,3 +99,8 @@ bool UFSMComponent::IsRunning() const
 	return bIsRunning;
 }
 
+const GameAI::FSM::State* UFSMComponent::GetCurrentState() const
+{
+	return FSMInstance ? FSMInstance->GetCurrentState() : nullptr;
+}
+
