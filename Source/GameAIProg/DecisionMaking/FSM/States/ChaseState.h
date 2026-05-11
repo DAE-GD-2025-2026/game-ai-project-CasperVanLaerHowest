@@ -1,0 +1,23 @@
+#pragma once
+
+#include <memory>
+
+#include "State.h"
+
+class Seek;
+
+namespace GameAI::FSM
+{
+	class ChaseState : public State
+	{
+	public:
+		virtual ~ChaseState();
+
+		virtual void Enter(AAIController& Controller) override;
+		virtual void Exit(AAIController& Controller) override;
+		virtual void Update(AAIController& Controller, float DeltaTime) override;
+
+	private:
+		std::unique_ptr<Seek> SeekBehavior{};
+	};
+}

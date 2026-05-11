@@ -3,6 +3,9 @@
 
 #include "FSMComponent.h"
 
+#include "AIController.h"
+#include "FSM.h"
+#include "States/State.h"
 
 // Sets default values for this component's properties
 UFSMComponent::UFSMComponent()
@@ -11,18 +14,28 @@ UFSMComponent::UFSMComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 
-	// TODO Setup FSM
+	FSMInstance = std::make_unique<GameAI::FSM::FSM>();
 }
 
+UFSMComponent::~UFSMComponent() = default;
 
-void UFSMComponent::AddState(std::unique_ptr<GameAI::FSM::State>&& NewState)
+
+GameAI::FSM::State* UFSMComponent::AddState(std::unique_ptr<GameAI::FSM::State>&& NewState)
 {
-	// TODO
+	if (FSMInstance)
+	{
+		return FSMInstance->AddState(std::move(NewState));
+	}
+
+	return nullptr;
 }
 
-void UFSMComponent::AddTransition(GameAI::FSM::State* From, GameAI::FSM::State* To, std::function<bool()> EvalFunc) const
+void UFSMComponent::AddTransition(GameAI::FSM::State* From, GameAI::FSM::State* To, std::function<bool()> EvalFunc)
 {
-	// TODO
+	if (FSMInstance)
+	{
+		FSMInstance->AddTransition(From, To, std::move(EvalFunc));
+	}
 }
 
 // Called when the game starts
@@ -36,19 +49,49 @@ void UFSMComponent::BeginPlay()
 void UFSMComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	// TODO
+
+	if (!bIsRunning || !FSMInstance)
+	{
+		return;
+	}
+
+	if (AAIController* AIController = Cast<AAIController>(GetOwner()))
+	{
+		FSMInstance->Update(*AIController, DeltaTime);
+	}
 }
 
 void UFSMComponent::StartLogic()
 {
 	Super::StartLogic();
 
-	// TODO
+	if (bIsRunning || !FSMInstance)
+	{
+		return;
+	}
+
+	if (AAIController* AIController = Cast<AAIController>(GetOwner()))
+	{
+		FSMInstance->Start(*AIController);
+		bIsRunning = true;
+	}
 }
 
 void UFSMComponent::StopLogic(const FString& Reason)
 {
-	// TODO
+	Super::StopLogic(Reason);
+
+	if (!bIsRunning || !FSMInstance)
+	{
+		return;
+	}
+
+	if (AAIController* AIController = Cast<AAIController>(GetOwner()))
+	{
+		FSMInstance->Stop(*AIController);
+	}
+
+	bIsRunning = false;
 }
 
 bool UFSMComponent::IsRunning() const

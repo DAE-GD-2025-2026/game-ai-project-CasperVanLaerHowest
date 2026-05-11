@@ -2,7 +2,11 @@
 
 #pragma once
 
+#include <memory>
+
 #include "CoreMinimal.h"
+#include "InputAction.h"
+#include "Movement/SteeringBehaviors/Steering/SteeringBehaviors.h"
 #include "Shared/Level_Base.h"
 #include "Level_FSM.generated.h"
 
@@ -12,6 +16,9 @@ class GAMEAIPROG_API ALevel_FSM : public ALevel_Base
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="FSM|Input")
+	UInputAction* SetThiefTargetAction{};
+
 	// Sets default values for this actor's properties
 	ALevel_FSM();
 
@@ -21,8 +28,14 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void BindLevelInputActions() override;
 
 private:
 	UPROPERTY()
-	ASteeringAgent* Agent{nullptr}; // ref
+	ASteeringAgent* GuardAgent{nullptr};
+	UPROPERTY()
+	ASteeringAgent* ThiefAgent{nullptr};
+
+	std::unique_ptr<Seek> ThiefSeek{};
+	void SetThiefTargetFromMouse();
 };

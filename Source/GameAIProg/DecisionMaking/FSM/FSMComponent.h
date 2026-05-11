@@ -12,7 +12,7 @@
 namespace GameAI::FSM
 {
 	class State;
-	class Transition;
+	struct Transition;
 	class FSM; // contains FSM logic
 }
 
@@ -24,6 +24,7 @@ class GAMEAIPROG_API UFSMComponent : public UBrainComponent
 public:
 	// Sets default values for this component's properties
 	UFSMComponent();
+	virtual ~UFSMComponent() override;
 
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
@@ -34,14 +35,14 @@ public:
 	
 	virtual bool IsRunning() const override; 
 	
-	void AddState(std::unique_ptr<GameAI::FSM::State>&& NewState);
-	void AddTransition(GameAI::FSM::State* From, GameAI::FSM::State* To, std::function<bool()> EvalFunc) const;
+	GameAI::FSM::State* AddState(std::unique_ptr<GameAI::FSM::State>&& NewState);
+	void AddTransition(GameAI::FSM::State* From, GameAI::FSM::State* To, std::function<bool()> EvalFunc);
 		
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
 private:
-	//std::unique_ptr<GameAI::FSM::FSM> FSMInstance;
+	std::unique_ptr<GameAI::FSM::FSM> FSMInstance;
 	bool bIsRunning{false};
 };
