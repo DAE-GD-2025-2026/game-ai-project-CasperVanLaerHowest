@@ -1,41 +1,32 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Level_FSM.h"
 
+#include <memory>
+
 #include "BehaviorTree/BlackboardComponent.h"
-#include "DrawDebugHelpers.h"
-#include "FSMComponent.h"
+#include "DecisionMaking/BehaviorTree/BT.h"
+#include "DecisionMaking/BehaviorTree/GameAIBehaviorTreeComponent.h"
 #include "DecisionMaking/GameAIController.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "InputCoreTypes.h"
-#include "Misc/CString.h"
 #include "imgui.h"
-#include "States/ChaseState.h"
-#include "States/PatrolState.h"
-#include "States/SearchState.h"
 
-
-// Sets default values
 ALevel_FSM::ALevel_FSM()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 }
 
-// Called when the game starts or when spawned
 void ALevel_FSM::BeginPlay()
 {
 	Super::BeginPlay();
 
 	const FVector SpawnCenter = GetNavMeshBoundsCenter(90.0f).value_or(FVector{0, 0, 90});
-	
-	GuardAgent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, 
-	SpawnCenter, FRotator::ZeroRotator);
+
+	GuardAgent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass, SpawnCenter, FRotator::ZeroRotator);
 	if (!IsValid(GuardAgent))
 	{
-		UE_LOG(LogTemp, Error, TEXT("FSM: Failed to spawn GuardAgent"));
+		UE_LOG(LogTemp, Error, TEXT("BehaviorTree: Failed to spawn GuardAgent"));
 		return;
 	}
 	GuardAgent->SetDebugRenderingEnabled(true);
@@ -43,10 +34,10 @@ void ALevel_FSM::BeginPlay()
 	GuardAgent->SpawnDefaultController();
 
 	ThiefAgent = GetWorld()->SpawnActor<ASteeringAgent>(SteeringAgentClass,
-	SpawnCenter + FVector{650,0,0}, FRotator::ZeroRotator);
+		SpawnCenter + FVector{650, 0, 0}, FRotator::ZeroRotator);
 	if (!IsValid(ThiefAgent))
 	{
-		UE_LOG(LogTemp, Error, TEXT("FSM: Failed to spawn ThiefAgent"));
+		UE_LOG(LogTemp, Error, TEXT("BehaviorTree: Failed to spawn ThiefAgent"));
 		return;
 	}
 	ThiefAgent->SetDebugRenderingEnabled(true);
@@ -55,141 +46,218 @@ void ALevel_FSM::BeginPlay()
 	ThiefAgent->SetSteeringBehavior(ThiefSeek.get());
 	MouseTarget.Position = FVector2D{ThiefAgent->GetActorLocation()};
 	ThiefSeek->SetTarget(MouseTarget);
-	
-	 
-	if (AGameAIController* AIController = Cast<AGameAIController>(GuardAgent->GetController()))
+
+	AGameAIController* AIController = Cast<AGameAIController>(GuardAgent->GetController());
+	if (!AIController)
 	{
-		if (UFSMComponent* FSM = Cast<UFSMComponent>(AIController->GetBrainComponent()))
+		UE_LOG(LogTemp, Error, TEXT("BehaviorTree: GuardAgent controller is not AGameAIController."));
+		return;
+	}
+
+	UGameAIBehaviorTreeComponent* BehaviorTreeComp = AIController->FindComponentByClass<UGameAIBehaviorTreeComponent>();
+	UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent();
+	if (!BehaviorTreeComp || !BlackboardComp)
+	{
+		UE_LOG(LogTemp, Error, TEXT("BehaviorTree: Guard controller is missing a behavior tree component or blackboard."));
+		return;
+	}
+
+	BlackboardComp->SetValueAsObject(TEXT("TargetActor"), ThiefAgent);
+	BlackboardComp->SetValueAsVector(TEXT("LastKnownTargetLocation"), ThiefAgent->GetActorLocation());
+	BlackboardComp->SetValueAsBool(TEXT("HasLastKnownTarget"), false);
+	BlackboardComp->SetValueAsBool(TEXT("SearchReachedLastKnownLocation"), false);
+
+	auto GetTargetInfo = [AIController]() -> TOptional<TPair<float, bool>>
+	{
+		if (!AIController || !AIController->GetPawn() || !AIController->GetWorld())
 		{
-			GameAI::FSM::State* PatrolState = FSM->AddState(std::make_unique<GameAI::FSM::PatrolState>());
-			GameAI::FSM::State* SearchState = FSM->AddState(std::make_unique<GameAI::FSM::SearchState>());
-			GameAI::FSM::State* ChaseState = FSM->AddState(std::make_unique<GameAI::FSM::ChaseState>());
+			return {};
+		}
 
-			UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent();
-			UE_LOG(LogTemp, Warning, TEXT("FSM: BlackboardComp valid: %s"), (BlackboardComp != nullptr ? TEXT("true") : TEXT("false")));
-			UE_LOG(LogTemp, Warning, TEXT("FSM: ThiefAgent valid: %s"), (IsValid(ThiefAgent) ? TEXT("true") : TEXT("false")));
+		UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent();
+		AActor* TargetActor = Blackboard ? Cast<AActor>(Blackboard->GetValueAsObject(TEXT("TargetActor"))) : nullptr;
+		if (!IsValid(TargetActor))
+		{
+			return {};
+		}
 
-			if (BlackboardComp)
+		const float Distance = FVector::Distance(AIController->GetPawn()->GetActorLocation(), TargetActor->GetActorLocation());
+		const bool bHasLOS = AIController->LineOfSightTo(TargetActor);
+		return TPair<float, bool>{Distance, bHasLOS};
+	};
+
+	auto StoreTargetLocation = [AIController]()
+	{
+		if (!AIController)
+		{
+			return;
+		}
+
+		UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent();
+		AActor* TargetActor = Blackboard ? Cast<AActor>(Blackboard->GetValueAsObject(TEXT("TargetActor"))) : nullptr;
+		if (Blackboard && IsValid(TargetActor))
+		{
+			Blackboard->SetValueAsVector(TEXT("LastKnownTargetLocation"), TargetActor->GetActorLocation());
+			Blackboard->SetValueAsBool(TEXT("HasLastKnownTarget"), true);
+			Blackboard->SetValueAsBool(TEXT("SearchReachedLastKnownLocation"), false);
+		}
+	};
+
+	auto ChaseSeek = std::make_shared<Seek>();
+	auto SearchSeek = std::make_shared<Seek>();
+	auto SearchWander = std::make_shared<Wander>();
+	SearchWander->SetWanderRadius(90.f);
+	SearchWander->SetWanderOffset(120.f);
+	auto PatrolSeek = std::make_shared<Seek>();
+	auto PatrolPoints = std::make_shared<TArray<FVector2D>>();
+	auto PatrolPointIndex = std::make_shared<int32>(0);
+	auto bReachedSearchPoint = std::make_shared<bool>(false);
+
+	auto Tree = std::make_unique<GameAI::BT::BehaviorTree>();
+	auto Root = std::make_unique<GameAI::BT::Selector>("Root Selector");
+
+	auto ChaseSequence = std::make_unique<GameAI::BT::Sequence>("Can See -> Chase");
+	ChaseSequence->AddChild(std::make_unique<GameAI::BT::Action>("Can See Thief",
+		[GetTargetInfo, StoreTargetLocation, this](AAIController&, float)
+		{
+			const TOptional<TPair<float, bool>> Info = GetTargetInfo();
+			const bool bCanSeeTarget = Info.IsSet() && Info->Key <= GuardDetectionRadius && Info->Value;
+			if (!bCanSeeTarget)
 			{
-				BlackboardComp->SetValueAsObject(TEXT("TargetActor"), ThiefAgent);
-				BlackboardComp->SetValueAsVector(TEXT("LastKnownTargetLocation"), ThiefAgent->GetActorLocation());
+				return GameAI::BT::ENodeResult::Failed;
 			}
 
-			auto GetTargetInfo = [AIController]() -> TOptional<TPair<float, bool>>
+			StoreTargetLocation();
+			return GameAI::BT::ENodeResult::Succeeded;
+		}));
+	ChaseSequence->AddChild(std::make_unique<GameAI::BT::SimpleParallel>(
+		std::make_unique<GameAI::BT::Action>("Chase Thief",
+			[ChaseSeek, BehaviorTreeComp](AAIController& Controller, float)
 			{
-				if (!AIController)
-				{
-					UE_LOG(LogTemp, Warning, TEXT("TargetInfo: AIController is invalid."));
-					return {};
-				}
-				if (!AIController->GetPawn())
-				{
-					UE_LOG(LogTemp, Warning, TEXT("TargetInfo: AIController->GetPawn() is invalid."));
-					return {};
-				}
-				if (!AIController->GetWorld())
-				{
-					UE_LOG(LogTemp, Warning, TEXT("TargetInfo: AIController->GetWorld() is invalid."));
-					return {};
-				}
-
-				UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent();
+				UBlackboardComponent* Blackboard = Controller.GetBlackboardComponent();
 				AActor* TargetActor = Blackboard ? Cast<AActor>(Blackboard->GetValueAsObject(TEXT("TargetActor"))) : nullptr;
-				if (!IsValid(TargetActor))
+				ASteeringAgent* Agent = Cast<ASteeringAgent>(Controller.GetPawn());
+				if (!IsValid(TargetActor) || !IsValid(Agent))
 				{
-					UE_LOG(LogTemp, Warning, TEXT("TargetInfo: TargetActor from Blackboard is invalid."));
-					return {};
+					return GameAI::BT::ENodeResult::Failed;
 				}
 
-				const float Dist = FVector::Distance(AIController->GetPawn()->GetActorLocation(), TargetActor->GetActorLocation());
-				const bool bHasLOS = AIController->LineOfSightTo(TargetActor);
-
-				return TPair<float, bool>{Dist, bHasLOS};
-			};
-
-			auto StoreTargetLocation = [AIController]()
+				ChaseSeek->SetTarget(FTargetData{FVector2D{TargetActor->GetActorLocation()}});
+				Agent->SetSteeringBehavior(ChaseSeek.get());
+				BehaviorTreeComp->SetLastRunningNode(nullptr);
+				return GameAI::BT::ENodeResult::Running;
+			}),
+		std::make_unique<GameAI::BT::Action>("Update Last Seen",
+			[StoreTargetLocation](AAIController&, float)
 			{
-				if (!AIController)
-				{
-					return;
-				}
+				StoreTargetLocation();
+				return GameAI::BT::ENodeResult::Running;
+			}),
+		false,
+		"Chase + Update Memory"));
+	Root->AddChild(std::move(ChaseSequence));
 
-				UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent();
-				AActor* TargetActor = Blackboard ? Cast<AActor>(Blackboard->GetValueAsObject(TEXT("TargetActor"))) : nullptr;
-				if (Blackboard && IsValid(TargetActor))
-				{
-					Blackboard->SetValueAsVector(TEXT("LastKnownTargetLocation"), TargetActor->GetActorLocation());
-				}
-			};
-
-			FSM->AddTransition(PatrolState, ChaseState, [GetTargetInfo, StoreTargetLocation, this]()
+	auto SearchSequence = std::make_unique<GameAI::BT::Sequence>("Has Memory -> Search");
+	SearchSequence->AddChild(std::make_unique<GameAI::BT::Action>("Has Last Seen Location",
+		[](AAIController& Controller, float)
+		{
+			UBlackboardComponent* Blackboard = Controller.GetBlackboardComponent();
+			return Blackboard && Blackboard->GetValueAsBool(TEXT("HasLastKnownTarget"))
+				? GameAI::BT::ENodeResult::Succeeded
+				: GameAI::BT::ENodeResult::Failed;
+		}));
+	SearchSequence->AddChild(std::make_unique<GameAI::BT::Action>("Search Last Seen Location",
+		[SearchSeek, SearchWander, bReachedSearchPoint, BehaviorTreeComp](AAIController& Controller, float)
+		{
+			ASteeringAgent* Agent = Cast<ASteeringAgent>(Controller.GetPawn());
+			UBlackboardComponent* Blackboard = Controller.GetBlackboardComponent();
+			if (!IsValid(Agent) || !Blackboard)
 			{
-				const TOptional<TPair<float, bool>> Info = GetTargetInfo();
-				UE_LOG(LogTemp, Warning, TEXT("Patrol to Chase Transition: Info.IsSet()=%s, Distance=%f, DetectionRadius=%f"),
-					Info.IsSet() ? TEXT("true") : TEXT("false"),
-					Info.IsSet() ? Info->Key : -1.0f,
-					GuardDetectionRadius);
-				const bool bCanChase = Info.IsSet() && Info->Key <= GuardDetectionRadius;
-				if (bCanChase)
-				{
-					StoreTargetLocation();
-				}
-				return bCanChase;
-			});
+				return GameAI::BT::ENodeResult::Failed;
+			}
 
-			FSM->AddTransition(SearchState, ChaseState, [GetTargetInfo, StoreTargetLocation, this]()
+			if (!Blackboard->GetValueAsBool(TEXT("SearchReachedLastKnownLocation")))
 			{
-				const TOptional<TPair<float, bool>> Info = GetTargetInfo();
-				const bool bCanChase = Info.IsSet() && Info->Key <= GuardDetectionRadius;
-				if (bCanChase)
-				{
-					StoreTargetLocation();
-				}
-				return bCanChase;
-			});
+				*bReachedSearchPoint = false;
+			}
 
-			FSM->AddTransition(ChaseState, SearchState, [GetTargetInfo, StoreTargetLocation, this]()
+			const FVector LastKnown = Blackboard->GetValueAsVector(TEXT("LastKnownTargetLocation"));
+			const FVector2D ToLastKnown = FVector2D{LastKnown} - Agent->GetPosition();
+			const float ReachDistance = FMath::Max(Agent->GetCapsuleRadius() * 1.5f, 100.f);
+			if (!*bReachedSearchPoint)
 			{
-				const TOptional<TPair<float, bool>> Info = GetTargetInfo();
-				const bool bShouldSearch = !Info.IsSet() || Info->Key > GuardDetectionRadius;
-				if (bShouldSearch)
-				{
-					StoreTargetLocation();
-				}
-				return bShouldSearch;
-			});
+				SearchSeek->SetTarget(FTargetData{FVector2D{LastKnown}});
+				Agent->SetSteeringBehavior(SearchSeek.get());
 
-			FSM->AddTransition(SearchState, PatrolState, [AIController]()
+				if (ToLastKnown.SizeSquared() <= ReachDistance * ReachDistance)
+				{
+					*bReachedSearchPoint = true;
+					Blackboard->SetValueAsBool(TEXT("SearchReachedLastKnownLocation"), true);
+					Blackboard->SetValueAsFloat(TEXT("SearchStartTime"), Controller.GetWorld()->GetTimeSeconds());
+					Agent->SetSteeringBehavior(SearchWander.get());
+				}
+
+				BehaviorTreeComp->SetLastRunningNode(nullptr);
+				return GameAI::BT::ENodeResult::Running;
+			}
+
+			Agent->SetSteeringBehavior(SearchWander.get());
+			const float SearchStartTime = Blackboard->GetValueAsFloat(TEXT("SearchStartTime"));
+			if (Controller.GetWorld() && Controller.GetWorld()->GetTimeSeconds() - SearchStartTime >= 2.5f)
 			{
-				if (!AIController)
-				{
-					return true;
-				}
+				Blackboard->SetValueAsBool(TEXT("HasLastKnownTarget"), false);
+				Blackboard->SetValueAsBool(TEXT("SearchReachedLastKnownLocation"), false);
+				*bReachedSearchPoint = false;
+				return GameAI::BT::ENodeResult::Failed;
+			}
 
-				UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent();
-				ASteeringAgent* Agent = Cast<ASteeringAgent>(AIController->GetPawn());
-				if (!Blackboard || !IsValid(Agent))
-				{
-					return true;
-				}
+			BehaviorTreeComp->SetLastRunningNode(nullptr);
+			return GameAI::BT::ENodeResult::Running;
+		},
+		[bReachedSearchPoint](AAIController&)
+		{
+			*bReachedSearchPoint = false;
+		}));
+	Root->AddChild(std::move(SearchSequence));
 
-				const FVector LastKnown = Blackboard->GetValueAsVector(TEXT("LastKnownTargetLocation"));
-				const FVector2D ToLastKnown = FVector2D{LastKnown} - Agent->GetPosition();
-				const float ReachDistance = FMath::Max(Agent->GetCapsuleRadius() * 1.5f, 100.f);
-				return ToLastKnown.SizeSquared() <= ReachDistance * ReachDistance;
-			});
+	Root->AddChild(std::make_unique<GameAI::BT::Action>("Patrol",
+		[PatrolSeek, PatrolPoints, PatrolPointIndex, BehaviorTreeComp](AAIController& Controller, float)
+		{
+			ASteeringAgent* Agent = Cast<ASteeringAgent>(Controller.GetPawn());
+			if (!IsValid(Agent))
+			{
+				return GameAI::BT::ENodeResult::Failed;
+			}
 
-			AIController->RunFiniteStateMachine();
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("FSM: GuardAgent controller is not AGameAIController. Check AIControllerClass on SteeringAgent BP/class."));
-	}
-	
+			if (PatrolPoints->IsEmpty())
+			{
+				const FVector2D Center = Agent->GetPosition();
+				PatrolPoints->Add(Center + FVector2D{-700.f, -700.f});
+				PatrolPoints->Add(Center + FVector2D{700.f, -700.f});
+				PatrolPoints->Add(Center + FVector2D{700.f, 700.f});
+				PatrolPoints->Add(Center + FVector2D{-700.f, 700.f});
+				*PatrolPointIndex = 0;
+			}
+
+			const FVector2D CurrentTarget = (*PatrolPoints)[*PatrolPointIndex];
+			const FVector2D ToPoint = CurrentTarget - Agent->GetPosition();
+			const float ReachDistance = FMath::Max(Agent->GetCapsuleRadius() * 1.5f, 80.f);
+			if (ToPoint.SizeSquared() <= ReachDistance * ReachDistance)
+			{
+				*PatrolPointIndex = (*PatrolPointIndex + 1) % PatrolPoints->Num();
+			}
+
+			PatrolSeek->SetTarget(FTargetData{(*PatrolPoints)[*PatrolPointIndex]});
+			Agent->SetSteeringBehavior(PatrolSeek.get());
+			BehaviorTreeComp->SetLastRunningNode(nullptr);
+			return GameAI::BT::ENodeResult::Running;
+		}));
+
+	Tree->SetRoot(std::move(Root));
+	BehaviorTreeComp->SetTree(std::move(Tree));
+	AIController->RunBehaviorTreeLogic();
 }
 
-// Called every frame
 void ALevel_FSM::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -217,10 +285,8 @@ void ALevel_FSM::Tick(float DeltaTime)
 		const bool bHasLOS = GuardAgent->GetController()
 			? GuardAgent->GetController()->LineOfSightTo(ThiefAgent)
 			: false;
-		const bool bWithinDetectionRadius = DistanceToThief <= GuardDetectionRadius;
-		const FColor DetectionColor = bWithinDetectionRadius
-			? FColor::Green
-			: FColor::Red;
+		const bool bCanSeeThief = DistanceToThief <= GuardDetectionRadius && bHasLOS;
+		const FColor DetectionColor = bCanSeeThief ? FColor::Green : FColor::Red;
 
 		DrawDebugCircle(
 			GetWorld(),
@@ -241,10 +307,8 @@ void ALevel_FSM::Tick(float DeltaTime)
 
 	if (AGameAIController* GuardController = GuardAgent ? Cast<AGameAIController>(GuardAgent->GetController()) : nullptr)
 	{
-		const UFSMComponent* GuardFSM = Cast<UFSMComponent>(GuardController->GetBrainComponent());
-		const GameAI::FSM::State* GuardState = GuardFSM ? GuardFSM->GetCurrentState() : nullptr;
 		UBlackboardComponent* Blackboard = GuardController->GetBlackboardComponent();
-		if (GuardState && Blackboard && FCStringAnsi::Strcmp(GuardState->GetDebugName(), "Search") == 0)
+		if (Blackboard && Blackboard->GetValueAsBool(TEXT("HasLastKnownTarget")))
 		{
 			const FVector LastKnown = Blackboard->GetValueAsVector(TEXT("LastKnownTargetLocation"));
 			const float DrawZ = IsValid(GuardAgent) ? GuardAgent->GetActorLocation().Z : LastKnown.Z;
@@ -267,7 +331,7 @@ void ALevel_FSM::BindLevelInputActions()
 	Super::BindLevelInputActions();
 	if (!PlayerEnhancedInputComponent)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("FSM: Enhanced input component missing, using direct LMB fallback."));
+		UE_LOG(LogTemp, Warning, TEXT("BehaviorTree: Enhanced input component missing, using direct LMB fallback."));
 		return;
 	}
 
@@ -278,7 +342,7 @@ void ALevel_FSM::BindLevelInputActions()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("FSM: SetThiefTargetAction not assigned, using direct LMB fallback."));
+		UE_LOG(LogTemp, Warning, TEXT("BehaviorTree: SetThiefTargetAction not assigned, using direct LMB fallback."));
 	}
 }
 
@@ -323,16 +387,21 @@ void ALevel_FSM::UpdateImGui()
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	ImGui::Text("FSM Debug");
+	ImGui::Text("Behavior Tree Debug");
 	ImGui::Indent();
 	ImGui::Text("Guard valid: %s", IsValid(GuardAgent) ? "Yes" : "No");
 	ImGui::Text("Thief valid: %s", IsValid(ThiefAgent) ? "Yes" : "No");
 	ImGui::Text("Guard controller present: %s", GuardAgent && GuardAgent->GetController() ? "Yes" : "No");
 	ImGui::Text("Thief controller present: %s", ThiefAgent && ThiefAgent->GetController() ? "Yes" : "No");
+
 	const AGameAIController* GuardController = GuardAgent ? Cast<AGameAIController>(GuardAgent->GetController()) : nullptr;
-	const UFSMComponent* GuardFSM = GuardController ? Cast<UFSMComponent>(GuardController->GetBrainComponent()) : nullptr;
-	const GameAI::FSM::State* GuardState = GuardFSM ? GuardFSM->GetCurrentState() : nullptr;
-	ImGui::Text("Guard state: %s", GuardState ? GuardState->GetDebugName() : "None");
+	const UBlackboardComponent* Blackboard = GuardController ? GuardController->GetBlackboardComponent() : nullptr;
+	const bool bHasMemory = Blackboard && Blackboard->GetValueAsBool(TEXT("HasLastKnownTarget"));
+	const bool bReachedSearchPoint = Blackboard && Blackboard->GetValueAsBool(TEXT("SearchReachedLastKnownLocation"));
+	ImGui::Text("Root: Selector");
+	ImGui::Text("Priority: Chase > Search > Patrol");
+	ImGui::Text("Has last seen location: %s", bHasMemory ? "Yes" : "No");
+	ImGui::Text("Reached search point: %s", bReachedSearchPoint ? "Yes" : "No");
 	ImGui::Text("Mouse target: (%.1f, %.1f)", MouseTarget.Position.X, MouseTarget.Position.Y);
 	ImGui::SliderFloat("Guard detect radius", &GuardDetectionRadius, 100.f, 4000.f, "%.1f");
 

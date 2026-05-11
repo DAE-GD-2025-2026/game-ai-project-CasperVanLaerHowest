@@ -14,6 +14,9 @@ class GAMEAIPROG_API AGameAIController : public AAIController
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|FSM")
 	TObjectPtr<UBlackboardData> FSMBlackboardAsset; 
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AI|BehaviorTree")
+	TObjectPtr<UBlackboardData> BehaviorTreeBlackboardAsset;
 	
 	// Sets default values for this actor's properties
 	AGameAIController();
@@ -21,9 +24,11 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	
 	void RunFiniteStateMachine();
+	void RunBehaviorTreeLogic();
 	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 	void InitFiniteStateMachine();
+	void InitBehaviorTree();
 };
