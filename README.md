@@ -74,6 +74,10 @@ Advanced navigation using **Navigation Meshes** instead of simple grids.
 - **Path Planning** — Finding a sequence of polygons from start to goal
 - **Path Smoothing** — Using the **String Pulling (Funnel) algorithm** to convert a sequence of polygons into a natural, straight-line path for the agent
 
+### Extra Assignment · Graph Coloring
+
+For the extra assignment, I implemented **Graph Coloring**. This can be found in the **GraphColor** level, where the graph is colored using as few colors as possible while making sure connected nodes never share the same color.
+
 ---
 
 ## 🏗️ Project Structure
